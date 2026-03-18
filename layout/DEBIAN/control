@@ -1,0 +1,9 @@
+Package: com.adventist.sabbathschool
+Name: Sabbath School
+Depends: firmware (>= 5.0)
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Суботня Школа — уроки Адвентистів Сьомого Дня
+Maintainer: Developer
+Author: Developer
+Section: Education
