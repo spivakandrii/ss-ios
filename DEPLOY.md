@@ -10,41 +10,37 @@ iPad 1G (iOS 5.1.1), jailbroken, SSH enabled.
 
 - WSL with Theos installed at `~/theos`
 - iPad on the same Wi-Fi network, awake (not sleeping)
+- **All commands below run via WSL** (`wsl bash -lc '...'`), not native Windows
 
 ## Build
 
 NTFS gives 777 permissions which breaks dpkg. Must copy to native Linux fs first:
 
 ```bash
-rm -rf /tmp/ss_build && cp -r /mnt/c/Source/ss_ios /tmp/ss_build
-cd /tmp/ss_build && chmod 0755 layout/DEBIAN
-export THEOS=~/theos && make clean && make package
+wsl bash -lc 'rm -rf /tmp/ss_build && cp -r /mnt/c/Source/ss_ios /tmp/ss_build && cd /tmp/ss_build && chmod 0755 layout/DEBIAN && export THEOS=~/theos && make clean && make package'
 ```
 
 ## Deploy
 
-SSH_ASKPASS trick for non-interactive password:
+SSH_ASKPASS trick for non-interactive password (must create each WSL session):
 
 ```bash
-cat > /tmp/sshpw.sh << 'EOF'
+wsl bash -lc 'cat > /tmp/sshpw.sh << "SEOF"
 #!/bin/bash
 echo alpine
-EOF
-chmod +x /tmp/sshpw.sh
-export SSH_ASKPASS=/tmp/sshpw.sh SSH_ASKPASS_REQUIRE=force DISPLAY=:0
-
-SSH_OPTS="-o StrictHostKeyChecking=no -o HostKeyAlgorithms=+ssh-rsa,ssh-dss -o PubkeyAcceptedAlgorithms=+ssh-rsa"
-IPAD="root@192.168.1.128"
+SEOF
+chmod +x /tmp/sshpw.sh'
 ```
+
+Old iPad SSH needs legacy algorithms: `HostKeyAlgorithms=+ssh-rsa,ssh-dss`, `PubkeyAcceptedAlgorithms=+ssh-rsa`
 
 ### Full sequence
 ```bash
 # Copy deb to iPad
-cp /tmp/ss_build/packages/*.deb /tmp/ss.deb
-scp $SSH_OPTS /tmp/ss.deb $IPAD:/tmp/ss.deb
+wsl bash -lc 'cp /tmp/ss_build/packages/*.deb /tmp/ss.deb && export SSH_ASKPASS=/tmp/sshpw.sh SSH_ASKPASS_REQUIRE=force DISPLAY=:0 && scp -o StrictHostKeyChecking=no -o HostKeyAlgorithms=+ssh-rsa,ssh-dss -o PubkeyAcceptedAlgorithms=+ssh-rsa /tmp/ss.deb root@192.168.1.128:/tmp/ss.deb'
 
 # Kill app, remove old, install new, sign, respring
-ssh $SSH_OPTS $IPAD "killall SabbathSchool 2>/dev/null; dpkg -r com.adventist.sabbathschool; dpkg -i /tmp/ss.deb; ldid -S /Applications/SabbathSchool.app/SabbathSchool; killall SpringBoard"
+wsl bash -lc 'export SSH_ASKPASS=/tmp/sshpw.sh SSH_ASKPASS_REQUIRE=force DISPLAY=:0 && ssh -o StrictHostKeyChecking=no -o HostKeyAlgorithms=+ssh-rsa,ssh-dss -o PubkeyAcceptedAlgorithms=+ssh-rsa root@192.168.1.128 "killall SabbathSchool 2>/dev/null; dpkg -r com.adventist.sabbathschool; dpkg -i /tmp/ss.deb; ldid -S /Applications/SabbathSchool.app/SabbathSchool; killall SpringBoard"'
 ```
 
 ## Update lesson data
