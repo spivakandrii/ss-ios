@@ -17,12 +17,14 @@ iPad 1G (iOS 5.1.1), jailbroken, SSH enabled.
 NTFS gives 777 permissions which breaks dpkg. Must copy to native Linux fs first:
 
 ```bash
-wsl bash -lc 'rm -rf /tmp/ss_build && cp -r /mnt/c/Source/ss_ios /tmp/ss_build && cd /tmp/ss_build && chmod 0755 layout/DEBIAN && export THEOS=~/theos && make clean && make package'
+wsl bash -lc 'rm -rf /tmp/ss_build && cp -r /mnt/c/Source/ss_ios /tmp/ss_build && cd /tmp/ss_build && chmod 0755 layout/DEBIAN && rm -rf packages && export THEOS=~/theos && make clean && make package'
 ```
+
+The .deb appears in `/tmp/ss_build/packages/`.
 
 ## Deploy
 
-SSH_ASKPASS trick for non-interactive password (must create each WSL session):
+### 1. Create SSH_ASKPASS helper (once per WSL session)
 
 ```bash
 wsl bash -lc 'cat > /tmp/sshpw.sh << "SEOF"
@@ -32,16 +34,23 @@ SEOF
 chmod +x /tmp/sshpw.sh'
 ```
 
-Old iPad SSH needs legacy algorithms: `HostKeyAlgorithms=+ssh-rsa,ssh-dss`, `PubkeyAcceptedAlgorithms=+ssh-rsa`
+### 2. Copy .deb to iPad
 
-### Full sequence
 ```bash
-# Copy deb to iPad
-wsl bash -lc 'cp /tmp/ss_build/packages/*.deb /tmp/ss.deb && export SSH_ASKPASS=/tmp/sshpw.sh SSH_ASKPASS_REQUIRE=force DISPLAY=:0 && scp -o StrictHostKeyChecking=no -o HostKeyAlgorithms=+ssh-rsa,ssh-dss -o PubkeyAcceptedAlgorithms=+ssh-rsa /tmp/ss.deb root@192.168.1.128:/tmp/ss.deb'
+wsl bash -lc 'DEB=$(ls -t /tmp/ss_build/packages/*.deb | head -1) && cp "$DEB" /tmp/ss.deb && export SSH_ASKPASS=/tmp/sshpw.sh SSH_ASKPASS_REQUIRE=force DISPLAY=:0 && scp -o StrictHostKeyChecking=no -o HostKeyAlgorithms=+ssh-rsa,ssh-dss -o PubkeyAcceptedAlgorithms=+ssh-rsa /tmp/ss.deb root@192.168.1.128:/tmp/ss.deb'
+```
 
-# Kill app, remove old, install new, sign, respring
+### 3. Remove old, install new, sign, respring
+
+```bash
 wsl bash -lc 'export SSH_ASKPASS=/tmp/sshpw.sh SSH_ASKPASS_REQUIRE=force DISPLAY=:0 && ssh -o StrictHostKeyChecking=no -o HostKeyAlgorithms=+ssh-rsa,ssh-dss -o PubkeyAcceptedAlgorithms=+ssh-rsa root@192.168.1.128 "killall SabbathSchool 2>/dev/null; dpkg -r com.adventist.sabbathschool; dpkg -i /tmp/ss.deb; ldid -S /Applications/SabbathSchool.app/SabbathSchool; killall SpringBoard"'
 ```
+
+## Notes
+
+- Old iPad SSH requires legacy algorithms: `HostKeyAlgorithms=+ssh-rsa,ssh-dss`, `PubkeyAcceptedAlgorithms=+ssh-rsa`
+- `SSH_ASKPASS` with `DISPLAY=:0` avoids interactive password prompts
+- `rm -rf packages` before build ensures only one .deb exists
 
 ## Update lesson data
 ```bash
