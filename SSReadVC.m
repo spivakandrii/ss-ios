@@ -104,6 +104,32 @@
     self.webView.delegate = self;
     self.webView.scalesPageToFit = NO;
     [self.view addSubview:self.webView];
+
+    // Swipe between days
+    UISwipeGestureRecognizer *swipeLeft = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(swipeNextDay)];
+    swipeLeft.direction = UISwipeGestureRecognizerDirectionLeft;
+    UISwipeGestureRecognizer *swipeRight = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(swipePrevDay)];
+    swipeRight.direction = UISwipeGestureRecognizerDirectionRight;
+    [self.webView addGestureRecognizer:swipeLeft];
+    [self.webView addGestureRecognizer:swipeRight];
+}
+
+- (void)swipeNextDay {
+    NSInteger next = self.currentDayIndex + 1;
+    if (next < (NSInteger)self.days.count) {
+        [self markCurrentDayRead];
+        self.daySelector.selectedSegmentIndex = next;
+        [self loadDay:next];
+    }
+}
+
+- (void)swipePrevDay {
+    NSInteger prev = self.currentDayIndex - 1;
+    if (prev >= 0) {
+        [self markCurrentDayRead];
+        self.daySelector.selectedSegmentIndex = prev;
+        [self loadDay:prev];
+    }
 }
 
 - (void)setupBottomBar {
