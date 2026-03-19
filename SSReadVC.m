@@ -1,7 +1,7 @@
 #import "SSReadVC.h"
 #import "SSAPIClient.h"
 
-@interface SSReadVC () <UIWebViewDelegate, UIActionSheetDelegate>
+@interface SSReadVC () <UIWebViewDelegate, UIActionSheetDelegate, UIGestureRecognizerDelegate>
 @property (nonatomic, strong) UIWebView *webView;
 @property (nonatomic, strong) UISegmentedControl *daySelector;
 @property (nonatomic, strong) UIActivityIndicatorView *spinner;
@@ -10,6 +10,7 @@
 @property (nonatomic, assign) NSInteger fontSize;
 @property (nonatomic, assign) BOOL darkMode;
 @property (nonatomic, copy) NSString *fontFamily;
+@property (nonatomic, assign) BOOL fullscreen;
 @end
 
 @implementation SSReadVC
@@ -105,6 +106,11 @@
     self.webView.scalesPageToFit = NO;
     [self.view addSubview:self.webView];
 
+    // Tap to toggle fullscreen
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(toggleFullscreen)];
+    tap.delegate = self;
+    [self.webView addGestureRecognizer:tap];
+
     // Swipe between days
     UISwipeGestureRecognizer *swipeLeft = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(swipeNextDay)];
     swipeLeft.direction = UISwipeGestureRecognizerDirectionLeft;
@@ -130,6 +136,32 @@
         self.daySelector.selectedSegmentIndex = prev;
         [self loadDay:prev];
     }
+}
+
+- (void)toggleFullscreen {
+    // Don't toggle if popup is open
+    NSString *popupVisible = [self.webView stringByEvaluatingJavaScriptFromString:@"document.getElementById('verse-popup').style.display"];
+    if ([popupVisible isEqualToString:@"block"]) return;
+
+    // Don't toggle if last tap was on a link
+    NSString *wasLink = [self.webView stringByEvaluatingJavaScriptFromString:@"window._lastTapOnLink||''"];
+    [self.webView stringByEvaluatingJavaScriptFromString:@"window._lastTapOnLink=''"];
+    if ([wasLink isEqualToString:@"1"]) return;
+
+    self.fullscreen = !self.fullscreen;
+    [UIView animateWithDuration:0.3 animations:^{
+        [self.navigationController setNavigationBarHidden:self.fullscreen animated:NO];
+        self.bottomBar.alpha = self.fullscreen ? 0.0 : 1.0;
+    } completion:^(BOOL finished) {
+        self.bottomBar.hidden = self.fullscreen;
+        // Resize webView to fill
+        CGFloat barH = self.fullscreen ? 0 : 44;
+        self.webView.frame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height - barH);
+    }];
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+    return YES;
 }
 
 - (void)setupBottomBar {
@@ -248,6 +280,10 @@
 
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
+    // Restore navbar when leaving
+    if (self.fullscreen) {
+        [self.navigationController setNavigationBarHidden:NO animated:NO];
+    }
     [self markCurrentDayRead];
 }
 
@@ -374,11 +410,19 @@
         // Popup overlay
         [html appendString:@"<div id='verse-popup' onclick='closeVerse()'><span id='verse-close'>&times;</span><div id='verse-content' onclick='event.stopPropagation()'><div id='verse-translations'></div><div id='verse-text'></div></div></div>"];
 
+        NSString *dayLabel = [self.daySelector titleForSegmentAtIndex:self.currentDayIndex];
+        dayLabel = [dayLabel stringByReplacingOccurrencesOfString:@"\u2713 " withString:@""];
+
         for (NSDictionary *read in reads) {
             NSString *title = [read objectForKey:@"title"];
+            NSString *date = [read objectForKey:@"date"];
             NSString *content = [read objectForKey:@"content"];
             if (title) {
                 [html appendFormat:@"<h2>%@</h2>", title];
+                if (date) {
+                    NSString *sub = self.darkMode ? @"color:#888;" : @"color:#999;";
+                    [html appendFormat:@"<p style='margin:-8px 0 12px 0;font-size:14px;%@'>%@, %@</p>", sub, dayLabel, date];
+                }
             }
             if (content) {
                 [html appendString:content];
@@ -428,6 +472,7 @@
         [html appendString:@"  document.getElementById('verse-popup').style.display = 'block';"];
         [html appendString:@"});"];
         [html appendString:@"function closeVerse() { document.getElementById('verse-popup').style.display = 'none'; }"];
+        [html appendString:@"document.addEventListener('touchstart',function(e){var el=e.target;while(el&&el.tagName!=='A')el=el.parentElement;window._lastTapOnLink=el?'1':'';},true);"];
         [html appendString:@"</script>"];
 
         [html appendString:@"</body></html>"];
