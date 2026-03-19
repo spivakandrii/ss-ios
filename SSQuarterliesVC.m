@@ -9,6 +9,26 @@
 
 @implementation SSQuarterliesVC
 
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self applyTheme];
+    [self.tableView reloadData];
+}
+
+- (void)applyTheme {
+    BOOL dark = [[NSUserDefaults standardUserDefaults] boolForKey:@"darkMode"];
+    self.tableView.backgroundColor = dark ? [UIColor colorWithWhite:0.1 alpha:1.0] : [UIColor whiteColor];
+    self.tableView.separatorColor = dark ? [UIColor colorWithWhite:0.2 alpha:1.0] : nil;
+    self.navigationController.navigationBar.tintColor = dark
+        ? [UIColor colorWithWhite:0.15 alpha:1.0]
+        : [UIColor colorWithRed:0.18 green:0.25 blue:0.38 alpha:1.0];
+    if (dark) {
+        self.spinner.activityIndicatorViewStyle = UIActivityIndicatorViewStyleWhite;
+    } else {
+        self.spinner.activityIndicatorViewStyle = UIActivityIndicatorViewStyleGray;
+    }
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"Суботня Школа";
@@ -54,7 +74,11 @@
     cell.detailTextLabel.text = [quarterly objectForKey:@"human_date"];
     cell.textLabel.numberOfLines = 2;
     cell.textLabel.font = [UIFont boldSystemFontOfSize:16];
-    cell.detailTextLabel.textColor = [UIColor grayColor];
+
+    BOOL dark = [[NSUserDefaults standardUserDefaults] boolForKey:@"darkMode"];
+    cell.backgroundColor = dark ? [UIColor colorWithWhite:0.13 alpha:1.0] : [UIColor whiteColor];
+    cell.textLabel.textColor = dark ? [UIColor colorWithWhite:0.85 alpha:1.0] : [UIColor blackColor];
+    cell.detailTextLabel.textColor = dark ? [UIColor colorWithWhite:0.5 alpha:1.0] : [UIColor grayColor];
 
     return cell;
 }

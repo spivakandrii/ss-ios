@@ -12,7 +12,14 @@
 
     SSLanguageVC *langVC = [[SSLanguageVC alloc] init];
     self.navigationController = [[UINavigationController alloc] initWithRootViewController:langVC];
-    self.navigationController.navigationBar.tintColor = [UIColor colorWithRed:0.18 green:0.25 blue:0.38 alpha:1.0];
+
+    // Apply theme to nav bar based on dark mode preference
+    BOOL dark = [[NSUserDefaults standardUserDefaults] boolForKey:@"darkMode"];
+    if (dark) {
+        self.navigationController.navigationBar.tintColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+    } else {
+        self.navigationController.navigationBar.tintColor = [UIColor colorWithRed:0.18 green:0.25 blue:0.38 alpha:1.0];
+    }
 
     self.window.rootViewController = self.navigationController;
     [self.window makeKeyAndVisible];

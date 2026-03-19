@@ -174,9 +174,10 @@
     UIBarButtonItem *fontUp = [[UIBarButtonItem alloc] initWithTitle:@"A+" style:UIBarButtonItemStyleBordered target:self action:@selector(fontLarger)];
     UIBarButtonItem *fontPicker = [[UIBarButtonItem alloc] initWithTitle:@"Aa" style:UIBarButtonItemStyleBordered target:self action:@selector(showFontPicker)];
     UIBarButtonItem *nightToggle = [[UIBarButtonItem alloc] initWithTitle:self.darkMode ? @"Light" : @"Night" style:UIBarButtonItemStyleBordered target:self action:@selector(toggleNightMode)];
+    UIBarButtonItem *noteBtn = [[UIBarButtonItem alloc] initWithTitle:@"Note" style:UIBarButtonItemStyleBordered target:self action:@selector(showNotes)];
     UIBarButtonItem *flex = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
 
-    [self.bottomBar setItems:[NSArray arrayWithObjects:fontDown, flex, fontUp, flex, fontPicker, flex, nightToggle, nil]];
+    [self.bottomBar setItems:[NSArray arrayWithObjects:fontDown, flex, fontUp, flex, fontPicker, flex, nightToggle, flex, noteBtn, nil]];
     [self.view addSubview:self.bottomBar];
 }
 
@@ -225,6 +226,55 @@
     self.fontFamily = font;
     [[NSUserDefaults standardUserDefaults] setObject:font forKey:@"fontFamily"];
     [self savePrefsAndReload];
+}
+
+- (NSString *)noteKey {
+    NSDictionary *day = [self.days objectAtIndex:self.currentDayIndex];
+    NSString *dayId = [day objectForKey:@"id"];
+    return [NSString stringWithFormat:@"note_%@_%@_%@", self.quarterlyId, self.lessonId, dayId];
+}
+
+- (void)showNotes {
+    UIViewController *noteVC = [[UIViewController alloc] init];
+    noteVC.title = @"Нотатки";
+
+    UITextView *textView = [[UITextView alloc] initWithFrame:noteVC.view.bounds];
+    textView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    textView.font = [UIFont systemFontOfSize:16];
+    textView.text = [[NSUserDefaults standardUserDefaults] stringForKey:[self noteKey]];
+    textView.tag = 100;
+
+    if (self.darkMode) {
+        noteVC.view.backgroundColor = [UIColor colorWithWhite:0.1 alpha:1.0];
+        textView.backgroundColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+        textView.textColor = [UIColor colorWithWhite:0.85 alpha:1.0];
+    }
+
+    [noteVC.view addSubview:textView];
+
+    noteVC.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Готово" style:UIBarButtonItemStyleDone target:self action:@selector(dismissNotes)];
+
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:noteVC];
+    if (self.darkMode) {
+        nav.navigationBar.tintColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+    }
+    [self presentModalViewController:nav animated:YES];
+}
+
+- (void)dismissNotes {
+    UINavigationController *nav = (UINavigationController *)[self modalViewController];
+    UIViewController *noteVC = [[nav viewControllers] objectAtIndex:0];
+    UITextView *textView = (UITextView *)[noteVC.view viewWithTag:100];
+    if (textView) {
+        NSString *text = textView.text;
+        if (text.length > 0) {
+            [[NSUserDefaults standardUserDefaults] setObject:text forKey:[self noteKey]];
+        } else {
+            [[NSUserDefaults standardUserDefaults] removeObjectForKey:[self noteKey]];
+        }
+        [[NSUserDefaults standardUserDefaults] synchronize];
+    }
+    [self dismissModalViewControllerAnimated:YES];
 }
 
 - (void)savePrefsAndReload {

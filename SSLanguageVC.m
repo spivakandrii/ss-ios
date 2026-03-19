@@ -1,8 +1,43 @@
 #import "SSLanguageVC.h"
 #import "SSQuarterliesVC.h"
 #import "SSAPIClient.h"
+#import <QuartzCore/QuartzCore.h>
 
 @implementation SSLanguageVC
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self applyTheme];
+}
+
+- (void)applyTheme {
+    BOOL dark = [[NSUserDefaults standardUserDefaults] boolForKey:@"darkMode"];
+    self.view.backgroundColor = dark ? [UIColor blackColor] : [UIColor whiteColor];
+    self.navigationController.navigationBar.tintColor = dark
+        ? [UIColor colorWithWhite:0.15 alpha:1.0]
+        : [UIColor colorWithRed:0.18 green:0.25 blue:0.38 alpha:1.0];
+
+    // Update label and buttons
+    for (UIView *sub in self.view.subviews) {
+        if ([sub isKindOfClass:[UILabel class]]) {
+            ((UILabel *)sub).textColor = dark ? [UIColor whiteColor] : [UIColor darkGrayColor];
+        }
+        if ([sub isKindOfClass:[UIButton class]]) {
+            UIButton *btn = (UIButton *)sub;
+            btn.layer.cornerRadius = 8;
+            btn.layer.borderWidth = 1;
+            if (dark) {
+                [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+                btn.layer.borderColor = [[UIColor colorWithWhite:0.4 alpha:1.0] CGColor];
+                btn.backgroundColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+            } else {
+                [btn setTitleColor:[UIColor colorWithRed:0.18 green:0.25 blue:0.38 alpha:1.0] forState:UIControlStateNormal];
+                btn.layer.borderColor = [[UIColor colorWithRed:0.18 green:0.25 blue:0.38 alpha:0.3] CGColor];
+                btn.backgroundColor = [UIColor whiteColor];
+            }
+        }
+    }
+}
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -16,15 +51,7 @@
     CGFloat gap = 20;
     CGFloat startY = h / 2 - btnH - gap;
 
-    UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(0, startY - 80, w, 30)];
-    label.text = @"Оберіть мову / Alegeti limba";
-    label.textAlignment = NSTextAlignmentCenter;
-    label.font = [UIFont systemFontOfSize:18];
-    label.textColor = [UIColor darkGrayColor];
-    label.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin;
-    [self.view addSubview:label];
-
-    UIButton *ukBtn = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    UIButton *ukBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     ukBtn.frame = CGRectMake((w - btnW) / 2, startY, btnW, btnH);
     [ukBtn setTitle:@"Ukrainska" forState:UIControlStateNormal];
     ukBtn.titleLabel.font = [UIFont boldSystemFontOfSize:22];
@@ -33,7 +60,7 @@
     ukBtn.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin;
     [self.view addSubview:ukBtn];
 
-    UIButton *roBtn = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    UIButton *roBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     roBtn.frame = CGRectMake((w - btnW) / 2, startY + btnH + gap, btnW, btnH);
     [roBtn setTitle:@"Romana" forState:UIControlStateNormal];
     roBtn.titleLabel.font = [UIFont boldSystemFontOfSize:22];
@@ -43,7 +70,7 @@
     [self.view addSubview:roBtn];
 
     // Online test button
-    UIButton *testBtn = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+    UIButton *testBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     testBtn.frame = CGRectMake((w - btnW) / 2, startY + (btnH + gap) * 2, btnW, 40);
     [testBtn setTitle:@"Test TLS 1.2 online" forState:UIControlStateNormal];
     testBtn.titleLabel.font = [UIFont systemFontOfSize:14];
