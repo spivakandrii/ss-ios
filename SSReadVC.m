@@ -1,26 +1,58 @@
 #import "SSReadVC.h"
 #import "SSAPIClient.h"
 
-@interface SSReadVC () <UIWebViewDelegate>
+@interface SSReadVC () <UIWebViewDelegate, UIActionSheetDelegate>
 @property (nonatomic, strong) UIWebView *webView;
 @property (nonatomic, strong) UISegmentedControl *daySelector;
 @property (nonatomic, strong) UIActivityIndicatorView *spinner;
+@property (nonatomic, strong) UIToolbar *bottomBar;
 @property (nonatomic, assign) NSInteger currentDayIndex;
-@property (nonatomic, strong) NSDictionary *bibleVerses; // verse key -> HTML
+@property (nonatomic, assign) NSInteger fontSize;
+@property (nonatomic, assign) BOOL darkMode;
+@property (nonatomic, copy) NSString *fontFamily;
 @end
 
 @implementation SSReadVC
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = [UIColor whiteColor];
 
+    // Load preferences
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    self.fontSize = [ud integerForKey:@"fontSize"];
+    if (self.fontSize < 14 || self.fontSize > 28) self.fontSize = 18;
+    self.darkMode = [ud boolForKey:@"darkMode"];
+    self.fontFamily = [ud stringForKey:@"fontFamily"];
+    if (!self.fontFamily) self.fontFamily = @"Georgia, serif";
     [self setupDaySelector];
     [self setupWebView];
+    [self setupBottomBar];
     [self setupSpinner];
+    [self applyThemeToChrome];
 
-    self.currentDayIndex = 0;
-    [self loadDay:0];
+    NSInteger startDay = self.initialDayIndex;
+    if (startDay < 0 || startDay >= (NSInteger)self.days.count) startDay = 0;
+    self.currentDayIndex = startDay;
+    self.daySelector.selectedSegmentIndex = startDay;
+    [self loadDay:startDay];
+}
+
+- (void)applyThemeToChrome {
+    if (self.darkMode) {
+        self.view.backgroundColor = [UIColor colorWithWhite:0.1 alpha:1.0];
+        self.navigationController.navigationBar.tintColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+        self.webView.backgroundColor = [UIColor colorWithWhite:0.1 alpha:1.0];
+        self.webView.opaque = NO;
+        self.bottomBar.tintColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+        self.daySelector.tintColor = [UIColor colorWithRed:0.48 green:0.64 blue:0.83 alpha:1.0];
+    } else {
+        self.view.backgroundColor = [UIColor whiteColor];
+        self.navigationController.navigationBar.tintColor = [UIColor colorWithRed:0.18 green:0.25 blue:0.38 alpha:1.0];
+        self.webView.backgroundColor = [UIColor whiteColor];
+        self.webView.opaque = YES;
+        self.bottomBar.tintColor = nil;
+        self.daySelector.tintColor = nil;
+    }
 }
 
 - (void)setupDaySelector {
@@ -57,18 +89,92 @@
     self.days = orderedDays;
 
     self.daySelector = [[UISegmentedControl alloc] initWithItems:titles];
+    self.daySelector.segmentedControlStyle = UISegmentedControlStyleBar;
     self.daySelector.selectedSegmentIndex = 0;
     [self.daySelector addTarget:self action:@selector(dayChanged:) forControlEvents:UIControlEventValueChanged];
     self.navigationItem.titleView = self.daySelector;
+    [self updateDaySelectorMarks];
 }
 
 - (void)setupWebView {
-    CGRect frame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height);
+    CGFloat barH = 44;
+    CGRect frame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height - barH);
     self.webView = [[UIWebView alloc] initWithFrame:frame];
     self.webView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.webView.delegate = self;
     self.webView.scalesPageToFit = NO;
     [self.view addSubview:self.webView];
+}
+
+- (void)setupBottomBar {
+    CGFloat barH = 44;
+    CGRect barFrame = CGRectMake(0, self.view.bounds.size.height - barH, self.view.bounds.size.width, barH);
+    self.bottomBar = [[UIToolbar alloc] initWithFrame:barFrame];
+    self.bottomBar.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin;
+
+    UIBarButtonItem *fontDown = [[UIBarButtonItem alloc] initWithTitle:@"A-" style:UIBarButtonItemStyleBordered target:self action:@selector(fontSmaller)];
+    UIBarButtonItem *fontUp = [[UIBarButtonItem alloc] initWithTitle:@"A+" style:UIBarButtonItemStyleBordered target:self action:@selector(fontLarger)];
+    UIBarButtonItem *fontPicker = [[UIBarButtonItem alloc] initWithTitle:@"Aa" style:UIBarButtonItemStyleBordered target:self action:@selector(showFontPicker)];
+    UIBarButtonItem *nightToggle = [[UIBarButtonItem alloc] initWithTitle:self.darkMode ? @"Light" : @"Night" style:UIBarButtonItemStyleBordered target:self action:@selector(toggleNightMode)];
+    UIBarButtonItem *flex = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
+
+    [self.bottomBar setItems:[NSArray arrayWithObjects:fontDown, flex, fontUp, flex, fontPicker, flex, nightToggle, nil]];
+    [self.view addSubview:self.bottomBar];
+}
+
+- (void)fontSmaller {
+    if (self.fontSize > 14) {
+        self.fontSize -= 2;
+        [self savePrefsAndReload];
+    }
+}
+
+- (void)fontLarger {
+    if (self.fontSize < 28) {
+        self.fontSize += 2;
+        [self savePrefsAndReload];
+    }
+}
+
+- (void)toggleNightMode {
+    self.darkMode = !self.darkMode;
+    [self applyThemeToChrome];
+    // Update button title
+    NSMutableArray *items = [NSMutableArray arrayWithArray:self.bottomBar.items];
+    UIBarButtonItem *nightBtn = [items lastObject];
+    nightBtn.title = self.darkMode ? @"Light" : @"Night";
+    [self savePrefsAndReload];
+}
+
+- (void)showFontPicker {
+    UIActionSheet *sheet = [[UIActionSheet alloc] initWithTitle:@"Шрифт"
+                                                      delegate:self
+                                             cancelButtonTitle:@"Скасувати"
+                                        destructiveButtonTitle:nil
+                                             otherButtonTitles:@"Georgia (serif)", @"Helvetica", @"Palatino", @"Courier", nil];
+    [sheet showFromToolbar:self.bottomBar];
+}
+
+- (void)actionSheet:(UIActionSheet *)actionSheet clickedButtonAtIndex:(NSInteger)buttonIndex {
+    NSString *font = nil;
+    switch (buttonIndex) {
+        case 0: font = @"Georgia, serif"; break;
+        case 1: font = @"Helvetica, sans-serif"; break;
+        case 2: font = @"Palatino, serif"; break;
+        case 3: font = @"Courier, monospace"; break;
+        default: return; // Cancel
+    }
+    self.fontFamily = font;
+    [[NSUserDefaults standardUserDefaults] setObject:font forKey:@"fontFamily"];
+    [self savePrefsAndReload];
+}
+
+- (void)savePrefsAndReload {
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    [ud setInteger:self.fontSize forKey:@"fontSize"];
+    [ud setBool:self.darkMode forKey:@"darkMode"];
+    [ud synchronize];
+    [self loadDay:self.currentDayIndex];
 }
 
 - (void)setupSpinner {
@@ -80,7 +186,43 @@
 }
 
 - (void)dayChanged:(UISegmentedControl *)sender {
+    [self markCurrentDayRead];
     [self loadDay:sender.selectedSegmentIndex];
+}
+
+- (void)markCurrentDayRead {
+    if (self.currentDayIndex >= (NSInteger)self.days.count) return;
+    NSDictionary *day = [self.days objectAtIndex:self.currentDayIndex];
+    NSString *dayId = [day objectForKey:@"id"];
+    NSString *key = [NSString stringWithFormat:@"read_%@_%@_%@", self.quarterlyId, self.lessonId, dayId];
+    [[NSUserDefaults standardUserDefaults] setBool:YES forKey:key];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [self updateDaySelectorMarks];
+}
+
+- (BOOL)isDayRead:(NSInteger)index {
+    if (index >= (NSInteger)self.days.count) return NO;
+    NSDictionary *day = [self.days objectAtIndex:index];
+    NSString *dayId = [day objectForKey:@"id"];
+    NSString *key = [NSString stringWithFormat:@"read_%@_%@_%@", self.quarterlyId, self.lessonId, dayId];
+    return [[NSUserDefaults standardUserDefaults] boolForKey:key];
+}
+
+- (void)updateDaySelectorMarks {
+    for (NSInteger i = 0; i < (NSInteger)self.days.count; i++) {
+        NSString *title = [self.daySelector titleForSegmentAtIndex:i];
+        // Remove existing checkmark
+        title = [title stringByReplacingOccurrencesOfString:@"\u2713 " withString:@""];
+        if ([self isDayRead:i]) {
+            title = [NSString stringWithFormat:@"\u2713 %@", title];
+        }
+        [self.daySelector setTitle:title forSegmentAtIndex:i];
+    }
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    [self markCurrentDayRead];
 }
 
 - (void)loadDay:(NSInteger)index {
@@ -166,22 +308,41 @@
         [html appendString:@"<html><head><meta charset='utf-8'>"];
         [html appendString:@"<meta name='viewport' content='width=device-width, initial-scale=1.0'>"];
         [html appendString:@"<style>"];
-        [html appendString:@"body { font-family: Georgia, serif; font-size: 18px; line-height: 1.6; padding: 16px; color: #333; background: #fefefe; }"];
-        [html appendString:@"h1, h2, h3 { color: #2E4161; }"];
-        [html appendString:@"blockquote { border-left: 3px solid #2E4161; padding-left: 12px; margin-left: 0; color: #555; font-style: italic; }"];
-        [html appendString:@"a.verse { color: #2E4161; text-decoration: underline; cursor: pointer; }"];
-        [html appendString:@"a { color: #2E4161; }"];
-        [html appendString:@"hr { border: none; border-top: 1px solid #ddd; margin: 20px 0; }"];
-        [html appendString:@"#verse-popup { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:999; }"];
-        [html appendString:@"#verse-content { position:absolute; top:10%; left:5%; right:5%; max-height:75%; overflow-y:auto; "];
-        [html appendString:@"background:#fff; border-radius:12px; padding:20px; box-shadow:0 4px 20px rgba(0,0,0,0.3); "];
-        [html appendString:@"font-family:Georgia,serif; font-size:17px; line-height:1.6; color:#333; }"];
-        [html appendString:@"#verse-content h2 { color:#2E4161; font-size:20px; margin:8px 0; }"];
-        [html appendString:@"#verse-content sup { color:#888; font-size:12px; }"];
-        [html appendString:@"#verse-close { position:absolute; top:12px; right:16px; font-size:28px; color:#999; cursor:pointer; z-index:1000; }"];
-        [html appendString:@"#verse-translations { margin-bottom:12px; }"];
-        [html appendString:@"#verse-translations button { padding:6px 14px; margin-right:6px; margin-bottom:4px; border:1px solid #2E4161; border-radius:6px; background:#fff; color:#2E4161; font-size:14px; cursor:pointer; }"];
-        [html appendString:@"#verse-translations button.active { background:#2E4161; color:#fff; }"];
+        if (self.darkMode) {
+            [html appendFormat:@"body { font-family: %@; font-size: %ldpx; line-height: 1.6; padding: 16px; color: #ccc; background: #1a1a1a; }", self.fontFamily, (long)self.fontSize];
+            [html appendString:@"h1, h2, h3 { color: #7ba4d4; }"];
+            [html appendString:@"blockquote { border-left: 3px solid #7ba4d4; padding-left: 12px; margin-left: 0; color: #999; font-style: italic; }"];
+            [html appendString:@"a.verse { color: #7ba4d4; text-decoration: underline; cursor: pointer; }"];
+            [html appendString:@"a { color: #7ba4d4; }"];
+            [html appendString:@"hr { border: none; border-top: 1px solid #333; margin: 20px 0; }"];
+            [html appendString:@"#verse-popup { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:999; }"];
+            [html appendString:@"#verse-content { position:absolute; top:10%; left:5%; right:5%; max-height:75%; overflow-y:auto; "];
+            [html appendString:@"background:#2a2a2a; border-radius:12px; padding:20px; box-shadow:0 4px 20px rgba(0,0,0,0.5); "];
+            [html appendFormat:@"font-family:%@; font-size:%ldpx; line-height:1.6; color:#ccc; }", self.fontFamily, (long)(self.fontSize - 1)];
+            [html appendString:@"#verse-content h2 { color:#7ba4d4; font-size:20px; margin:8px 0; }"];
+            [html appendString:@"#verse-content sup { color:#666; font-size:12px; }"];
+            [html appendString:@"#verse-close { position:absolute; top:12px; right:16px; font-size:28px; color:#666; cursor:pointer; z-index:1000; }"];
+            [html appendString:@"#verse-translations { margin-bottom:12px; }"];
+            [html appendString:@"#verse-translations button { padding:6px 14px; margin-right:6px; margin-bottom:4px; border:1px solid #7ba4d4; border-radius:6px; background:#2a2a2a; color:#7ba4d4; font-size:14px; cursor:pointer; }"];
+            [html appendString:@"#verse-translations button.active { background:#7ba4d4; color:#1a1a1a; }"];
+        } else {
+            [html appendFormat:@"body { font-family: %@; font-size: %ldpx; line-height: 1.6; padding: 16px; color: #333; background: #fefefe; }", self.fontFamily, (long)self.fontSize];
+            [html appendString:@"h1, h2, h3 { color: #2E4161; }"];
+            [html appendString:@"blockquote { border-left: 3px solid #2E4161; padding-left: 12px; margin-left: 0; color: #555; font-style: italic; }"];
+            [html appendString:@"a.verse { color: #2E4161; text-decoration: underline; cursor: pointer; }"];
+            [html appendString:@"a { color: #2E4161; }"];
+            [html appendString:@"hr { border: none; border-top: 1px solid #ddd; margin: 20px 0; }"];
+            [html appendString:@"#verse-popup { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:999; }"];
+            [html appendString:@"#verse-content { position:absolute; top:10%; left:5%; right:5%; max-height:75%; overflow-y:auto; "];
+            [html appendString:@"background:#fff; border-radius:12px; padding:20px; box-shadow:0 4px 20px rgba(0,0,0,0.3); "];
+            [html appendFormat:@"font-family:%@; font-size:%ldpx; line-height:1.6; color:#333; }", self.fontFamily, (long)(self.fontSize - 1)];
+            [html appendString:@"#verse-content h2 { color:#2E4161; font-size:20px; margin:8px 0; }"];
+            [html appendString:@"#verse-content sup { color:#888; font-size:12px; }"];
+            [html appendString:@"#verse-close { position:absolute; top:12px; right:16px; font-size:28px; color:#999; cursor:pointer; z-index:1000; }"];
+            [html appendString:@"#verse-translations { margin-bottom:12px; }"];
+            [html appendString:@"#verse-translations button { padding:6px 14px; margin-right:6px; margin-bottom:4px; border:1px solid #2E4161; border-radius:6px; background:#fff; color:#2E4161; font-size:14px; cursor:pointer; }"];
+            [html appendString:@"#verse-translations button.active { background:#2E4161; color:#fff; }"];
+        }
         [html appendString:@"</style></head><body>"];
 
         // Popup overlay

@@ -56,6 +56,8 @@
 - (void)languageTapped:(UIButton *)sender {
     NSString *lang = (sender.tag == 1) ? @"uk" : @"ro";
     [SSAPIClient shared].language = lang;
+    [[NSUserDefaults standardUserDefaults] setObject:lang forKey:@"lastLanguage"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
 
     SSQuarterliesVC *vc = [[SSQuarterliesVC alloc] init];
     [self.navigationController pushViewController:vc animated:YES];

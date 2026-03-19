@@ -9,6 +9,11 @@
 
 @implementation SSLessonsVC
 
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self.tableView reloadData];
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = self.quarterlyTitle ? self.quarterlyTitle : @"Уроки";
@@ -50,11 +55,33 @@
     }
 
     NSDictionary *lesson = [self.lessons objectAtIndex:indexPath.row];
-    cell.textLabel.text = [NSString stringWithFormat:@"%@. %@", [lesson objectForKey:@"id"], [lesson objectForKey:@"title"]];
-    cell.detailTextLabel.text = [NSString stringWithFormat:@"%@ — %@", [lesson objectForKey:@"start_date"], [lesson objectForKey:@"end_date"]];
+    NSString *lessonId = [lesson objectForKey:@"id"];
+    cell.textLabel.text = [NSString stringWithFormat:@"%@. %@", lessonId, [lesson objectForKey:@"title"]];
+
+    // Count read days for this lesson
+    NSInteger readCount = 0;
+    NSInteger totalDays = 7;
+    for (NSInteger d = 1; d <= 7; d++) {
+        NSString *dayId = [NSString stringWithFormat:@"%02ld", (long)d];
+        NSString *key = [NSString stringWithFormat:@"read_%@_%@_%@", self.quarterlyId, lessonId, dayId];
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:key]) readCount++;
+    }
+
+    NSString *dates = [NSString stringWithFormat:@"%@ — %@", [lesson objectForKey:@"start_date"], [lesson objectForKey:@"end_date"]];
+    if (readCount > 0) {
+        cell.detailTextLabel.text = [NSString stringWithFormat:@"%@  (%ld/%ld)", dates, (long)readCount, (long)totalDays];
+        if (readCount >= totalDays) {
+            cell.detailTextLabel.textColor = [UIColor colorWithRed:0.2 green:0.6 blue:0.2 alpha:1.0];
+        } else {
+            cell.detailTextLabel.textColor = [UIColor grayColor];
+        }
+    } else {
+        cell.detailTextLabel.text = dates;
+        cell.detailTextLabel.textColor = [UIColor grayColor];
+    }
+
     cell.textLabel.numberOfLines = 2;
     cell.textLabel.font = [UIFont boldSystemFontOfSize:15];
-    cell.detailTextLabel.textColor = [UIColor grayColor];
 
     return cell;
 }
