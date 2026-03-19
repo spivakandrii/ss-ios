@@ -4,10 +4,10 @@ include $(THEOS)/makefiles/common.mk
 
 APPLICATION_NAME = SabbathSchool
 
-SabbathSchool_FILES = main.m SSAppDelegate.m SSAPIClient.m SSHTTPClient.m SSLanguageVC.m SSQuarterliesVC.m SSLessonsVC.m SSReadVC.m
-SabbathSchool_FRAMEWORKS = UIKit Foundation CoreGraphics Security
-SabbathSchool_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-\#warnings -Wno-implicit-function-declaration -Ilib
-SabbathSchool_LDFLAGS = -Wl,-undefined,dynamic_lookup -Wl,-flat_namespace -Llib -lwolfssl
+SabbathSchool_FILES = main.m SSAppDelegate.m SSAPIClient.m SSLanguageVC.m SSQuarterliesVC.m SSLessonsVC.m SSReadVC.m
+SabbathSchool_FRAMEWORKS = UIKit Foundation CoreGraphics
+SabbathSchool_CFLAGS = -fobjc-arc -Wno-deprecated-declarations
+SabbathSchool_LDFLAGS = -Wl,-undefined,dynamic_lookup -Wl,-flat_namespace
 TARGET_CODESIGN = true
 
 export ARCHS = armv7
