@@ -8,7 +8,18 @@
       "Bash(cat:*)",
       "Bash(ping:*)",
       "Bash(where:*)",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\(''''date''''\\), d.get\\(''''title''''\\)\\)\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\(''''date''''\\), d.get\\(''''title''''\\)\\)\")",
+      "Bash(gh repo:*)",
+      "Bash(grep -n \"^\\\\s*//\" /c/Source/ss_ios/*.m)",
+      "Bash(grep -v \"^[0-9]*:.*//.*\")",
+      "Bash(grep -rn \"^[[:space:]]*//.*TODO\\\\|^[[:space:]]*//.*FIXME\\\\|^[[:space:]]*//.*HACK\" /c/Source/ss_ios/*.m /c/Source/ss_ios/*.h)",
+      "Bash(grep -n \"^@\" /c/Source/ss_ios/*.m)",
+      "Bash(grep -n \"^-\\\\s*\\(\" /c/Source/ss_ios/*.m)",
+      "Bash(grep -n \"^+\\\\s*\\(\" /c/Source/ss_ios/*.m)",
+      "Bash(grep -rn \"dataPath\\\\|loadJSON\\\\|errorWithMessage\\\\|networkRequestURL\" /c/Source/ss_ios/*.m /c/Source/ss_ios/*.h)",
+      "Bash(grep -rn \"testOnline\\\\|ensureInit\\\\|connectToHost\\\\|extractBodyFromHTTPResponse\" /c/Source/ss_ios/*.m /c/Source/ss_ios/*.h)",
+      "Bash(grep -E \"\\\\.m$|\\\\.h$|\\\\.py$|Resources|data|Makefile|README\")",
+      "Bash(grep -r \"proxy\\\\.py\\\\|8080\\\\|HTTP.*proxy\" /c/Source/ss_ios/*.m /c/Source/ss_ios/*.h /c/Source/ss_ios/README.md)"
     ]
   }
 }
