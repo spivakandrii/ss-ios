@@ -114,37 +114,53 @@
             reads = [NSArray array];
         }
 
-        // Build bible verses lookup from first read's bible array
-        NSMutableDictionary *verses = [NSMutableDictionary dictionary];
+        // Build bible verses lookup for ALL translations
+        NSMutableArray *translationNames = [NSMutableArray array];
+        NSMutableDictionary *allTranslations = [NSMutableDictionary dictionary]; // name -> {key: html}
         if (reads.count > 0) {
             NSDictionary *firstRead = [reads objectAtIndex:0];
             NSArray *bibleArr = [firstRead objectForKey:@"bible"];
-            if ([bibleArr isKindOfClass:[NSArray class]] && bibleArr.count > 0) {
-                // Use first translation (UKR)
-                NSDictionary *translation = [bibleArr objectAtIndex:0];
-                NSDictionary *verseDict = [translation objectForKey:@"verses"];
-                if ([verseDict isKindOfClass:[NSDictionary class]]) {
-                    [verses addEntriesFromDictionary:verseDict];
+            if ([bibleArr isKindOfClass:[NSArray class]]) {
+                for (NSDictionary *translation in bibleArr) {
+                    NSString *name = [translation objectForKey:@"name"];
+                    NSDictionary *verseDict = [translation objectForKey:@"verses"];
+                    if (name && [verseDict isKindOfClass:[NSDictionary class]]) {
+                        [translationNames addObject:name];
+                        [allTranslations setObject:verseDict forKey:name];
+                    }
                 }
             }
         }
-        self.bibleVerses = verses;
 
-        // Build bible verses JSON for JavaScript
-        NSMutableString *versesJS = [NSMutableString stringWithString:@"var bibleVerses = {"];
-        NSArray *allKeys = [verses allKeys];
-        for (NSInteger i = 0; i < (NSInteger)allKeys.count; i++) {
-            NSString *key = [allKeys objectAtIndex:i];
-            NSString *val = [verses objectForKey:key];
-            // Escape for JS string
-            val = [val stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"];
-            val = [val stringByReplacingOccurrencesOfString:@"'" withString:@"\\'"];
-            val = [val stringByReplacingOccurrencesOfString:@"\n" withString:@"\\n"];
-            val = [val stringByReplacingOccurrencesOfString:@"\r" withString:@""];
-            [versesJS appendFormat:@"'%@':'%@'", key, val];
-            if (i < (NSInteger)allKeys.count - 1) [versesJS appendString:@","];
+        // Build JS: bibleVerses = { 'UKR': { 'key': 'html', ... }, 'CUV': { ... } }
+        NSMutableString *versesJS = [NSMutableString stringWithString:@"var bibleVerses={"];
+        for (NSInteger t = 0; t < (NSInteger)translationNames.count; t++) {
+            NSString *tName = [translationNames objectAtIndex:t];
+            NSDictionary *verses = [allTranslations objectForKey:tName];
+            [versesJS appendFormat:@"'%@':{", tName];
+            NSArray *allKeys = [verses allKeys];
+            for (NSInteger i = 0; i < (NSInteger)allKeys.count; i++) {
+                NSString *key = [allKeys objectAtIndex:i];
+                NSString *val = [verses objectForKey:key];
+                val = [val stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"];
+                val = [val stringByReplacingOccurrencesOfString:@"'" withString:@"\\'"];
+                val = [val stringByReplacingOccurrencesOfString:@"\n" withString:@"\\n"];
+                val = [val stringByReplacingOccurrencesOfString:@"\r" withString:@""];
+                [versesJS appendFormat:@"'%@':'%@'", key, val];
+                if (i < (NSInteger)allKeys.count - 1) [versesJS appendString:@","];
+            }
+            [versesJS appendString:@"}"];
+            if (t < (NSInteger)translationNames.count - 1) [versesJS appendString:@","];
         }
         [versesJS appendString:@"};"];
+
+        // Build JS array of translation names
+        [versesJS appendString:@"var translationNames=["];
+        for (NSInteger t = 0; t < (NSInteger)translationNames.count; t++) {
+            [versesJS appendFormat:@"'%@'", [translationNames objectAtIndex:t]];
+            if (t < (NSInteger)translationNames.count - 1) [versesJS appendString:@","];
+        }
+        [versesJS appendString:@"];"];
 
         NSMutableString *html = [NSMutableString string];
         [html appendString:@"<html><head><meta charset='utf-8'>"];
@@ -163,10 +179,13 @@
         [html appendString:@"#verse-content h2 { color:#2E4161; font-size:20px; margin:8px 0; }"];
         [html appendString:@"#verse-content sup { color:#888; font-size:12px; }"];
         [html appendString:@"#verse-close { position:absolute; top:12px; right:16px; font-size:28px; color:#999; cursor:pointer; z-index:1000; }"];
+        [html appendString:@"#verse-translations { margin-bottom:12px; }"];
+        [html appendString:@"#verse-translations button { padding:6px 14px; margin-right:6px; margin-bottom:4px; border:1px solid #2E4161; border-radius:6px; background:#fff; color:#2E4161; font-size:14px; cursor:pointer; }"];
+        [html appendString:@"#verse-translations button.active { background:#2E4161; color:#fff; }"];
         [html appendString:@"</style></head><body>"];
 
         // Popup overlay
-        [html appendString:@"<div id='verse-popup' onclick='closeVerse()'><span id='verse-close'>&times;</span><div id='verse-content'></div></div>"];
+        [html appendString:@"<div id='verse-popup' onclick='closeVerse()'><span id='verse-close'>&times;</span><div id='verse-content' onclick='event.stopPropagation()'><div id='verse-translations'></div><div id='verse-text'></div></div></div>"];
 
         for (NSDictionary *read in reads) {
             NSString *title = [read objectForKey:@"title"];
@@ -183,6 +202,33 @@
         // JavaScript for verse popups
         [html appendString:@"<script>"];
         [html appendString:versesJS];
+        [html appendFormat:@"var lang='%@';", [SSAPIClient shared].language];
+        [html appendString:@"var currentKey='';"];
+        // Inject saved translation from NSUserDefaults
+        NSString *savedKey = [NSString stringWithFormat:@"bible_%@", [SSAPIClient shared].language];
+        NSString *savedTrans = [[NSUserDefaults standardUserDefaults] stringForKey:savedKey];
+        if (savedTrans) {
+            [html appendFormat:@"var savedTranslation='%@';", savedTrans];
+        } else {
+            [html appendString:@"var savedTranslation=null;"];
+        }
+        [html appendString:@"function getSavedTranslation(){return savedTranslation||translationNames[0];}"];
+        [html appendString:@"function saveTranslation(t){savedTranslation=t;location.href='ss://save/'+t;}"];
+        [html appendString:@"function showVerse(key,trans){"];
+        [html appendString:@"  var t=trans||getSavedTranslation();"];
+        [html appendString:@"  if(!bibleVerses[t])t=translationNames[0];"];
+        [html appendString:@"  var text=bibleVerses[t]?bibleVerses[t][key]:null;"];
+        [html appendString:@"  if(!text)text='<p>Текст не знайдено</p>';"];
+        [html appendString:@"  document.getElementById('verse-text').innerHTML=text;"];
+        [html appendString:@"  var btns=document.getElementById('verse-translations');btns.innerHTML='';"];
+        [html appendString:@"  for(var i=0;i<translationNames.length;i++){"];
+        [html appendString:@"    var b=document.createElement('button');b.textContent=translationNames[i];"];
+        [html appendString:@"    if(translationNames[i]===t)b.className='active';"];
+        [html appendString:@"    b.setAttribute('data-t',translationNames[i]);"];
+        [html appendString:@"    b.onclick=function(e){e.stopPropagation();var tn=this.getAttribute('data-t');saveTranslation(tn);showVerse(currentKey,tn);};"];
+        [html appendString:@"    btns.appendChild(b);"];
+        [html appendString:@"  }"];
+        [html appendString:@"}"];
         [html appendString:@"document.addEventListener('click', function(e) {"];
         [html appendString:@"  var el = e.target;"];
         [html appendString:@"  while(el && el.tagName !== 'A') el = el.parentElement;"];
@@ -190,9 +236,8 @@
         [html appendString:@"  e.preventDefault();"];
         [html appendString:@"  var key = el.getAttribute('verse');"];
         [html appendString:@"  if(!key) return;"];
-        [html appendString:@"  var text = bibleVerses[key];"];
-        [html appendString:@"  if(!text) { text = '<p>Текст не знайдено</p>'; }"];
-        [html appendString:@"  document.getElementById('verse-content').innerHTML = text;"];
+        [html appendString:@"  currentKey=key;"];
+        [html appendString:@"  showVerse(key);"];
         [html appendString:@"  document.getElementById('verse-popup').style.display = 'block';"];
         [html appendString:@"});"];
         [html appendString:@"function closeVerse() { document.getElementById('verse-popup').style.display = 'none'; }"];
@@ -206,8 +251,16 @@
 #pragma mark - UIWebViewDelegate
 
 - (BOOL)webView:(UIWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType {
+    NSString *urlStr = [[request URL] absoluteString];
+    // Intercept ss://save/<translation> from JS
+    if ([urlStr hasPrefix:@"ss://save/"]) {
+        NSString *trans = [urlStr substringFromIndex:10];
+        NSString *savedKey = [NSString stringWithFormat:@"bible_%@", [SSAPIClient shared].language];
+        [[NSUserDefaults standardUserDefaults] setObject:trans forKey:savedKey];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+        return NO;
+    }
     if (navigationType == UIWebViewNavigationTypeLinkClicked) {
-        // Don't open external links - verse links handled by JS
         return NO;
     }
     return YES;
