@@ -3,5 +3,6 @@
 @interface SSHTTPClient : NSObject
 
 + (NSData *)fetchURL:(NSString *)urlString;
++ (void)logToFile:(NSString *)msg;
 
 @end

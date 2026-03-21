@@ -42,10 +42,15 @@ Built with [Theos](https://theos.dev) for jailbroken devices.
 
 All lesson data comes from the open [Adventech API](https://github.com/Adventech):
 ```
-https://sabbath-school.adventech.io/api/v2
+https://sabbath-school.adventech.io/api/v2/{lang}/quarterlies/index.json
+https://sabbath-school.adventech.io/api/v2/{lang}/quarterlies/{qid}/lessons/index.json
+https://sabbath-school.adventech.io/api/v2/{lang}/quarterlies/{qid}/lessons/{lid}/index.json
+https://sabbath-school.adventech.io/api/v2/{lang}/quarterlies/{qid}/lessons/{lid}/days/{did}/read/index.json
 ```
 
-Data is pre-downloaded and bundled in `Resources/data/` for offline use.
+> **Note:** All API endpoints require `/index.json` suffix — without it the server returns HTML (SPA) instead of JSON.
+
+Data is pre-downloaded and bundled in `Resources/data/` for offline use. If local data is missing, the app fetches from the API via TLS 1.2 (libcurl + OpenSSL).
 
 ### Data structure
 ```
@@ -214,7 +219,7 @@ Link order matters: `-lcurl` before `-lssl` before `-lcrypto`, then `-lz` (syste
 2. `curl_global_init(CURL_GLOBAL_SSL)` runs once at class load via `+initialize`
 3. SSL verification is disabled (`CURLOPT_SSL_VERIFYPEER = 0`) because iOS 5 has no CA bundle accessible to the app
 4. `SSAPIClient` tries local bundle first, falls back to `SSHTTPClient` in background thread if file not found
-5. TLS test button on language screen verifies connectivity
+5. API URLs require `/index.json` suffix (e.g. `.../quarterlies/index.json`)
 
 ## Troubleshooting
 

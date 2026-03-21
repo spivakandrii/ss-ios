@@ -24,25 +24,25 @@
 
 - (void)fetchQuarterlies:(SSAPICompletion)completion {
     NSString *localPath = [NSString stringWithFormat:@"%@/%@/quarterlies.json", [self dataPath], self.language];
-    NSString *remoteURL = [NSString stringWithFormat:@"%@/%@/quarterlies", SS_API_BASE, self.language];
+    NSString *remoteURL = [NSString stringWithFormat:@"%@/%@/quarterlies/index.json", SS_API_BASE, self.language];
     [self loadLocalPath:localPath orRemoteURL:remoteURL completion:completion];
 }
 
 - (void)fetchLessonsForQuarterly:(NSString *)quarterlyId completion:(SSAPICompletion)completion {
     NSString *localPath = [NSString stringWithFormat:@"%@/%@/%@/lessons.json", [self dataPath], self.language, quarterlyId];
-    NSString *remoteURL = [NSString stringWithFormat:@"%@/%@/quarterlies/%@/lessons", SS_API_BASE, self.language, quarterlyId];
+    NSString *remoteURL = [NSString stringWithFormat:@"%@/%@/quarterlies/%@/lessons/index.json", SS_API_BASE, self.language, quarterlyId];
     [self loadLocalPath:localPath orRemoteURL:remoteURL completion:completion];
 }
 
 - (void)fetchLessonDetailForQuarterly:(NSString *)quarterlyId lesson:(NSString *)lessonId completion:(SSAPICompletion)completion {
     NSString *localPath = [NSString stringWithFormat:@"%@/%@/%@/%@/index.json", [self dataPath], self.language, quarterlyId, lessonId];
-    NSString *remoteURL = [NSString stringWithFormat:@"%@/%@/quarterlies/%@/lessons/%@", SS_API_BASE, self.language, quarterlyId, lessonId];
+    NSString *remoteURL = [NSString stringWithFormat:@"%@/%@/quarterlies/%@/lessons/%@/index.json", SS_API_BASE, self.language, quarterlyId, lessonId];
     [self loadLocalPath:localPath orRemoteURL:remoteURL completion:completion];
 }
 
 - (void)fetchDayReadForQuarterly:(NSString *)quarterlyId lesson:(NSString *)lessonId day:(NSString *)dayId completion:(SSAPICompletion)completion {
     NSString *localPath = [NSString stringWithFormat:@"%@/%@/%@/%@/%@.json", [self dataPath], self.language, quarterlyId, lessonId, dayId];
-    NSString *remoteURL = [NSString stringWithFormat:@"%@/%@/quarterlies/%@/lessons/%@/days/%@/read", SS_API_BASE, self.language, quarterlyId, lessonId, dayId];
+    NSString *remoteURL = [NSString stringWithFormat:@"%@/%@/quarterlies/%@/lessons/%@/days/%@/read/index.json", SS_API_BASE, self.language, quarterlyId, lessonId, dayId];
     [self loadLocalPath:localPath orRemoteURL:remoteURL completion:completion];
 }
 
@@ -50,11 +50,14 @@
 
 - (void)loadLocalPath:(NSString *)localPath orRemoteURL:(NSString *)remoteURL completion:(SSAPICompletion)completion {
     // Try local first
+    [SSHTTPClient logToFile:[NSString stringWithFormat:@"APIClient: trying local: %@", localPath]];
     id json = [self loadJSON:localPath];
     if (json) {
+        [SSHTTPClient logToFile:@"APIClient: found local, returning"];
         if (completion) completion(json, nil);
         return;
     }
+    [SSHTTPClient logToFile:[NSString stringWithFormat:@"APIClient: no local, trying remote: %@", remoteURL]];
 
     // Try network in background
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{

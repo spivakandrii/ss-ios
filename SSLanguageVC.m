@@ -70,29 +70,6 @@
     roBtn.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin;
     [self.view addSubview:roBtn];
 
-    UIButton *tlsBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    tlsBtn.frame = CGRectMake((w - btnW) / 2, startY + (btnH + gap) * 2, btnW, 40);
-    [tlsBtn setTitle:@"Test TLS 1.2" forState:UIControlStateNormal];
-    tlsBtn.titleLabel.font = [UIFont systemFontOfSize:14];
-    [tlsBtn addTarget:self action:@selector(testTLS) forControlEvents:UIControlEventTouchUpInside];
-    tlsBtn.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin;
-    [self.view addSubview:tlsBtn];
-}
-
-- (void)testTLS {
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSData *data = [SSHTTPClient fetchURL:@"https://sabbath-school.adventech.io/api/v2/uk/quarterlies"];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            NSString *msg;
-            if (data) {
-                msg = [NSString stringWithFormat:@"TLS 1.2 OK! Отримано %lu байт", (unsigned long)data.length];
-            } else {
-                msg = @"TLS не працює — дані не отримано";
-            }
-            UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"TLS Test" message:msg delegate:nil cancelButtonTitle:@"OK" otherButtonTitles:nil];
-            [alert show];
-        });
-    });
 }
 
 - (void)languageTapped:(UIButton *)sender {
