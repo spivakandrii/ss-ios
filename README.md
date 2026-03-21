@@ -14,7 +14,9 @@ Built with [Theos](https://theos.dev) for jailbroken devices.
 - ✅ Read progress tracking per lesson
 - 👆 Swipe between days, fullscreen reading mode
 - 🔄 Auto-opens today's lesson on launch
-- 🌐 Ukrainian & Romanian languages
+- 🌐 91 languages via Adventech API (Ukrainian, Romanian, English + all others)
+- 🔒 TLS 1.2 via statically linked OpenSSL + libcurl (bypasses iOS 5 TLS 1.0 limitation)
+- 💾 Smart caching: shows local data instantly, silently refreshes from API in background
 
 ## Screenshots
 
@@ -25,11 +27,11 @@ Built with [Theos](https://theos.dev) for jailbroken devices.
 | File | Description |
 |------|-------------|
 | `SSAppDelegate.m` | App launch, auto-open today's lesson |
-| `SSLanguageVC.m` | Language selection (uk/ro) |
+| `SSLanguageVC.m` | Language selection (uk/ro/en + 91 languages from API) |
 | `SSQuarterliesVC.m` | List of quarterly studies |
 | `SSLessonsVC.m` | List of lessons with read progress |
 | `SSReadVC.m` | Main reader — UIWebView with HTML content, verse popups, notes, font/theme controls |
-| `SSAPIClient.m` | Data loader (offline from bundle, fallback to online via TLS 1.2) |
+| `SSAPIClient.m` | Data loader: cache (Documents) → bundle → API. Background refresh silently |
 | `SSHTTPClient.m` | HTTP client using libcurl + OpenSSL for TLS 1.2 on iOS 5 |
 | `download_days.py` | Script to fetch lesson data from API |
 | `build_openssl.sh` | Cross-compile OpenSSL 1.1.1w for armv7 |
