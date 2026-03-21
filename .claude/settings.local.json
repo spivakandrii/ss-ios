@@ -19,7 +19,12 @@
       "Bash(grep -rn \"dataPath\\\\|loadJSON\\\\|errorWithMessage\\\\|networkRequestURL\" /c/Source/ss_ios/*.m /c/Source/ss_ios/*.h)",
       "Bash(grep -rn \"testOnline\\\\|ensureInit\\\\|connectToHost\\\\|extractBodyFromHTTPResponse\" /c/Source/ss_ios/*.m /c/Source/ss_ios/*.h)",
       "Bash(grep -E \"\\\\.m$|\\\\.h$|\\\\.py$|Resources|data|Makefile|README\")",
-      "Bash(grep -r \"proxy\\\\.py\\\\|8080\\\\|HTTP.*proxy\" /c/Source/ss_ios/*.m /c/Source/ss_ios/*.h /c/Source/ss_ios/README.md)"
+      "Bash(grep -r \"proxy\\\\.py\\\\|8080\\\\|HTTP.*proxy\" /c/Source/ss_ios/*.m /c/Source/ss_ios/*.h /c/Source/ss_ios/README.md)",
+      "Bash(gh release:*)",
+      "Bash(ldid -S /Applications/SabbathSchool.app/SabbathSchool)",
+      "Bash(killall SpringBoard\":*)",
+      "Bash(gh auth:*)",
+      "Bash(wsl -e bash -c 'TOOLCHAIN=/home/aspi/theos/toolchain/linux/iphone/bin && SDK=/home/aspi/theos/sdks/iPhoneOS9.3.sdk && cd /home/aspi/openssl-build/openssl-1.1.1w && $TOOLCHAIN/clang -target arm-apple-darwin11 -arch armv7 -isysroot $SDK -miphoneos-version-min=5.1 -Wno-unused-command-line-argument -DOPENSSL_NO_SECURE_MEMORY -I. -Iinclude -Icrypto/include -c crypto/aes/aes_cbc.c -o /tmp/test.o 2>&1 && echo SUCCESS && file /tmp/test.o')"
     ]
   }
 }

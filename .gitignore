@@ -4,3 +4,6 @@ packages/
 .DS_Store
 download_data.py
 download_days.py
+openssl-1.1.1w/
+openssl-1.1.1w.tar.gz
+test_curl_compile.sh
