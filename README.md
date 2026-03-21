@@ -57,17 +57,26 @@ data/{lang}/{quarter}/{lesson}/{day}.json            — day content with Bible 
 
 ## Prerequisites
 
-| Tool | Purpose |
-|------|---------|
-| **WSL** (Windows Subsystem for Linux) | Build environment |
-| **Theos** (`~/theos` in WSL) | iOS build system |
-| **iPhoneOS 9.3 SDK** | In `~/theos/sdks/` |
-| **Python 3** | For downloading lesson data |
-| **Jailbroken iPad 1G** | SSH enabled, on same Wi-Fi |
+| Tool | Purpose | Location |
+|------|---------|----------|
+| **WSL** (Windows Subsystem for Linux) | Build environment | Windows feature |
+| **Theos** | iOS build system | `~/theos` in WSL |
+| **Clang 11.1** cross-compiler | Compiles for armv7 | `~/theos/toolchain/linux/iphone/bin/clang` |
+| **iPhoneOS 9.3 SDK** | iOS headers & libs | `~/theos/sdks/iPhoneOS9.3.sdk` |
+| **ldid** | Ad-hoc code signing | On iPad via Cydia |
+| **Python 3** | For downloading lesson data | WSL or Windows |
+| **Jailbroken iPad 1G** | Target device, SSH enabled | Same Wi-Fi, IP `192.168.1.128` |
+
+### iPad setup (one-time via Cydia)
+- OpenSSH (for SSH/SCP access)
+- `ldid` (for code signing)
+- Default SSH: `root` / `alpine`
 
 ## Build
 
-> **Important:** NTFS gives 777 permissions which breaks dpkg. Always copy to native Linux filesystem first.
+> **Important:** NTFS gives 777 permissions which breaks dpkg. Always copy to native Linux filesystem (`/tmp/`) first.
+>
+> **Important:** WSL `/tmp/` is volatile — files disappear between sessions. The SSH password helper must be recreated each session.
 
 ```bash
 # Copy to Linux fs, fix permissions, build
@@ -140,7 +149,11 @@ After SpringBoard respring, the app appears on the home screen.
 
 ## Rebuilding TLS Libraries (if needed)
 
-The pre-built `lib/libssl.a`, `lib/libcrypto.a`, and `lib/libcurl.a` are included in the repo. Only rebuild if you need to update versions.
+The pre-built `lib/libssl.a`, `lib/libcrypto.a`, and `lib/libcurl.a` are included in the repo. You do NOT need to rebuild them for normal app development. Only rebuild if you need to update OpenSSL/curl versions.
+
+### Why custom TLS?
+
+iPad 1G (iOS 5.1.1) only supports TLS 1.0 natively via `NSURLConnection`/SecureTransport. Modern servers require TLS 1.2+. We statically link OpenSSL + libcurl to bypass the OS limitation.
 
 ### OpenSSL 1.1.1w
 
@@ -148,14 +161,20 @@ The pre-built `lib/libssl.a`, `lib/libcrypto.a`, and `lib/libcurl.a` are include
 wsl bash -lc "bash /mnt/c/Source/ss_ios/build_openssl.sh"
 ```
 
-What it does:
-1. Downloads OpenSSL 1.1.1w source
-2. Configures with `linux-generic32` target, CC set to Theos clang with `-target arm-apple-darwin11 -arch armv7 -isysroot iPhoneOS9.3.sdk`
-3. Generates `opensslconf.h` via perl (must run `make include/openssl/opensslconf.h` before building)
-4. Builds `libssl.a` and `libcrypto.a`
-5. Copies to `lib/` and headers to `include/openssl/`
+**What it does:**
+1. Downloads OpenSSL 1.1.1w source to `~/openssl-build/`
+2. Configures with `linux-generic32` target (NOT `ios-cross` — that one breaks with our clang)
+3. Sets CC to Theos clang: `-target arm-apple-darwin11 -arch armv7 -isysroot iPhoneOS9.3.sdk`
+4. **Must generate headers first** — `make include/openssl/opensslconf.h` (perl-based, fails silently if skipped)
+5. Builds `libcrypto.a` (~2.7M) and `libssl.a` (~573K)
+6. Copies `.a` files to `lib/` and headers to `include/openssl/`
 
-Key flags: `no-shared no-dso no-engine no-tests no-asm no-async -DOPENSSL_NO_SECURE_MEMORY`
+**Key configure flags:** `no-shared no-dso no-engine no-tests no-asm no-async -DOPENSSL_NO_SECURE_MEMORY`
+
+**Known issues:**
+- `ar rcs` flag causes `ranlib: error: Invalid option: '-f'` — use `llvm-ar` or `ar rc` + separate `ranlib`
+- Must create `cc` symlink: `ln -sf $TOOLCHAIN/clang $TOOLCHAIN/cc`
+- Warnings about "no symbols" in some `.o` files are normal (platform-specific stubs)
 
 ### libcurl 7.88.1
 
@@ -163,22 +182,39 @@ Key flags: `no-shared no-dso no-engine no-tests no-asm no-async -DOPENSSL_NO_SEC
 wsl bash -lc "bash /mnt/c/Source/ss_ios/build_curl.sh"
 ```
 
-What it does:
-1. Downloads curl 7.88.1 source
-2. Creates a manual `curl_config.h` (autotools configure can't cross-compile)
-3. Compiles all `.c` files in `lib/`, `lib/vtls/`, `lib/vauth/` with Theos clang
-4. Creates `libcurl.a` with `llvm-ar`
-5. Copies to `lib/` and headers to `include/curl/`
+**What it does:**
+1. Downloads curl 7.88.1 source to `~/curl-build/`
+2. **Creates a manual `curl_config.h`** — autotools `./configure` cannot cross-compile (fails at "checking whether we are cross compiling" and can't detect OpenSSL via link test)
+3. Compiles all `.c` files in `lib/`, `lib/vtls/`, `lib/vauth/` individually with Theos clang
+4. Creates `libcurl.a` (~487K) with `llvm-ar` (standard `ar` has ranlib flag issues)
+5. Copies `.a` to `lib/` and headers to `include/curl/`
 
-Disabled protocols: LDAP, DICT, TELNET, TFTP, POP3, IMAP, SMTP, GOPHER, MQTT, RTSP, SMB, FTP, FILE
+**Key defines in curl_config.h:**
+- `USE_OPENSSL 1` — enables OpenSSL backend
+- `HAVE_STDBOOL_H 1` — **required**, without it `bool` type is undefined and nothing compiles
+- `CURL_DISABLE_SMB/FTP/FILE/...` — disables unused protocols (SMB missing symbol caused crash!)
 
-### Makefile flags
+**Disabled protocols:** LDAP, DICT, TELNET, TFTP, POP3, IMAP, SMTP, GOPHER, MQTT, RTSP, SMB, FTP, FILE
+
+**Skip list** (files not compiled): `curl_ntlm_core`, `curl_ntlm_wb`, `openldap`, `ldap`, `telnet`, `dict`, `tftp`, `imap`, `pop3`, `smtp`, `gopher`, `mqtt`, `rtsp`, `pingpong`, `bufq`, `bufref`
+
+### Makefile integration
 
 ```makefile
-SabbathSchool_CFLAGS = ... -Iinclude
-SabbathSchool_LDFLAGS = ... -Llib -lcurl -lssl -lcrypto -lz
-SabbathSchool_FRAMEWORKS = ... Security
+SabbathSchool_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Iinclude
+SabbathSchool_LDFLAGS = -Wl,-undefined,dynamic_lookup -Wl,-flat_namespace -Llib -lcurl -lssl -lcrypto -lz
+SabbathSchool_FRAMEWORKS = UIKit Foundation CoreGraphics Security
 ```
+
+Link order matters: `-lcurl` before `-lssl` before `-lcrypto`, then `-lz` (system zlib).
+
+### How TLS is used in the app
+
+1. `SSHTTPClient` wraps libcurl C API — single static method `+[SSHTTPClient fetchURL:]`
+2. `curl_global_init(CURL_GLOBAL_SSL)` runs once at class load via `+initialize`
+3. SSL verification is disabled (`CURLOPT_SSL_VERIFYPEER = 0`) because iOS 5 has no CA bundle accessible to the app
+4. `SSAPIClient` tries local bundle first, falls back to `SSHTTPClient` in background thread if file not found
+5. TLS test button on language screen verifies connectivity
 
 ## Troubleshooting
 
@@ -186,9 +222,15 @@ SabbathSchool_FRAMEWORKS = ... Security
 |---------|----------|
 | **No route to host** | iPad is sleeping or not on Wi-Fi. Wake it up |
 | **Connection refused** | OpenSSH not running on iPad. Reboot iPad |
+| **Permission denied (SSH)** | SSH password helper expired. Recreate `/tmp/sshpw.sh` (see Deploy) |
 | **DEBIAN permissions error** | Building on NTFS. Copy to `/tmp/` first (see Build) |
 | **lib*.a: no table of contents** | Run `ranlib` on .a files before building (see Build) |
+| **Symbol not found: _Curl_handler_*` | Missing `CURL_DISABLE_*` in `curl_config.h`. Add the define and rebuild curl |
+| **unknown type name 'bool'** | Missing `HAVE_STDBOOL_H` in `curl_config.h` |
+| **opensslconf.h not found** | Run `make include/openssl/opensslconf.h` in OpenSSL source dir before building |
 | **White screen on launch** | Data files missing in `Resources/data/`. Run `download_days.py` |
+| **App crashes on launch** | Check crash log: `ssh root@iPad "cat /var/mobile/Library/Logs/CrashReporter/LatestCrash-SabbathSchool.plist"` — look for "Symbol not found" |
+| **ar: Invalid option '-f'** | Use `llvm-ar` instead of `ar` in build scripts |
 
 ## Tech Stack
 
