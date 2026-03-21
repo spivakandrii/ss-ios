@@ -8,7 +8,7 @@
 @property (nonatomic, strong) UIToolbar *bottomBar;
 @property (nonatomic, assign) NSInteger currentDayIndex;
 @property (nonatomic, assign) NSInteger fontSize;
-@property (nonatomic, assign) BOOL darkMode;
+@property (nonatomic, copy) NSString *theme; // "light", "dark", "sepia"
 @property (nonatomic, copy) NSString *fontFamily;
 @property (nonatomic, assign) BOOL fullscreen;
 @end
@@ -22,7 +22,8 @@
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
     self.fontSize = [ud integerForKey:@"fontSize"];
     if (self.fontSize < 14 || self.fontSize > 28) self.fontSize = 18;
-    self.darkMode = [ud boolForKey:@"darkMode"];
+    self.theme = [ud stringForKey:@"theme"];
+    if (!self.theme) self.theme = [ud boolForKey:@"darkMode"] ? @"dark" : @"light";
     self.fontFamily = [ud stringForKey:@"fontFamily"];
     if (!self.fontFamily) self.fontFamily = @"Georgia, serif";
     [self setupDaySelector];
@@ -38,14 +39,26 @@
     [self loadDay:startDay];
 }
 
+- (BOOL)isDark { return [self.theme isEqualToString:@"dark"]; }
+- (BOOL)isSepia { return [self.theme isEqualToString:@"sepia"]; }
+
 - (void)applyThemeToChrome {
-    if (self.darkMode) {
+    if ([self isDark]) {
         self.view.backgroundColor = [UIColor colorWithWhite:0.1 alpha:1.0];
         self.navigationController.navigationBar.tintColor = [UIColor colorWithWhite:0.15 alpha:1.0];
         self.webView.backgroundColor = [UIColor colorWithWhite:0.1 alpha:1.0];
         self.webView.opaque = NO;
         self.bottomBar.tintColor = [UIColor colorWithWhite:0.15 alpha:1.0];
         self.daySelector.tintColor = [UIColor colorWithRed:0.48 green:0.64 blue:0.83 alpha:1.0];
+    } else if ([self isSepia]) {
+        UIColor *sepiaBg = [UIColor colorWithRed:0.96 green:0.92 blue:0.84 alpha:1.0];
+        UIColor *sepiaTint = [UIColor colorWithRed:0.55 green:0.40 blue:0.25 alpha:1.0];
+        self.view.backgroundColor = sepiaBg;
+        self.navigationController.navigationBar.tintColor = sepiaTint;
+        self.webView.backgroundColor = sepiaBg;
+        self.webView.opaque = YES;
+        self.bottomBar.tintColor = sepiaTint;
+        self.daySelector.tintColor = sepiaTint;
     } else {
         self.view.backgroundColor = [UIColor whiteColor];
         self.navigationController.navigationBar.tintColor = [UIColor colorWithRed:0.18 green:0.25 blue:0.38 alpha:1.0];
@@ -173,7 +186,8 @@
     UIBarButtonItem *fontDown = [[UIBarButtonItem alloc] initWithTitle:@"A-" style:UIBarButtonItemStyleBordered target:self action:@selector(fontSmaller)];
     UIBarButtonItem *fontUp = [[UIBarButtonItem alloc] initWithTitle:@"A+" style:UIBarButtonItemStyleBordered target:self action:@selector(fontLarger)];
     UIBarButtonItem *fontPicker = [[UIBarButtonItem alloc] initWithTitle:@"Aa" style:UIBarButtonItemStyleBordered target:self action:@selector(showFontPicker)];
-    UIBarButtonItem *nightToggle = [[UIBarButtonItem alloc] initWithTitle:self.darkMode ? @"Light" : @"Night" style:UIBarButtonItemStyleBordered target:self action:@selector(toggleNightMode)];
+    NSString *themeTitle = [self isDark] ? @"Sepia" : [self isSepia] ? @"Light" : @"Dark";
+    UIBarButtonItem *nightToggle = [[UIBarButtonItem alloc] initWithTitle:themeTitle style:UIBarButtonItemStyleBordered target:self action:@selector(cycleTheme)];
     UIBarButtonItem *noteBtn = [[UIBarButtonItem alloc] initWithTitle:@"Note" style:UIBarButtonItemStyleBordered target:self action:@selector(showNotes)];
     UIBarButtonItem *flex = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
 
@@ -195,13 +209,21 @@
     }
 }
 
-- (void)toggleNightMode {
-    self.darkMode = !self.darkMode;
+- (void)cycleTheme {
+    if ([self.theme isEqualToString:@"light"]) {
+        self.theme = @"dark";
+    } else if ([self.theme isEqualToString:@"dark"]) {
+        self.theme = @"sepia";
+    } else {
+        self.theme = @"light";
+    }
     [self applyThemeToChrome];
-    // Update button title
-    NSMutableArray *items = [NSMutableArray arrayWithArray:self.bottomBar.items];
-    UIBarButtonItem *nightBtn = [items lastObject];
-    nightBtn.title = self.darkMode ? @"Light" : @"Night";
+    // Update button title — shows what NEXT theme will be
+    NSString *next = [self isDark] ? @"Sepia" : [self isSepia] ? @"Light" : @"Dark";
+    // Find theme button (second to last, before Note)
+    NSArray *items = self.bottomBar.items;
+    UIBarButtonItem *themeBtn = [items objectAtIndex:[items count] - 3]; // flex, themeBtn, flex, noteBtn
+    themeBtn.title = next;
     [self savePrefsAndReload];
 }
 
@@ -244,10 +266,14 @@
     textView.text = [[NSUserDefaults standardUserDefaults] stringForKey:[self noteKey]];
     textView.tag = 100;
 
-    if (self.darkMode) {
+    if ([self isDark]) {
         noteVC.view.backgroundColor = [UIColor colorWithWhite:0.1 alpha:1.0];
         textView.backgroundColor = [UIColor colorWithWhite:0.15 alpha:1.0];
         textView.textColor = [UIColor colorWithWhite:0.85 alpha:1.0];
+    } else if ([self isSepia]) {
+        noteVC.view.backgroundColor = [UIColor colorWithRed:0.96 green:0.92 blue:0.84 alpha:1.0];
+        textView.backgroundColor = [UIColor colorWithRed:0.94 green:0.89 blue:0.80 alpha:1.0];
+        textView.textColor = [UIColor colorWithRed:0.36 green:0.25 blue:0.20 alpha:1.0];
     }
 
     [noteVC.view addSubview:textView];
@@ -255,8 +281,10 @@
     noteVC.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Готово" style:UIBarButtonItemStyleDone target:self action:@selector(dismissNotes)];
 
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:noteVC];
-    if (self.darkMode) {
+    if ([self isDark]) {
         nav.navigationBar.tintColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+    } else if ([self isSepia]) {
+        nav.navigationBar.tintColor = [UIColor colorWithRed:0.55 green:0.40 blue:0.25 alpha:1.0];
     }
     [self presentModalViewController:nav animated:YES];
 }
@@ -280,7 +308,8 @@
 - (void)savePrefsAndReload {
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
     [ud setInteger:self.fontSize forKey:@"fontSize"];
-    [ud setBool:self.darkMode forKey:@"darkMode"];
+    [ud setObject:self.theme forKey:@"theme"];
+    [ud removeObjectForKey:@"darkMode"];
     [ud synchronize];
     [self loadDay:self.currentDayIndex];
 }
@@ -420,41 +449,48 @@
         [html appendString:@"<html><head><meta charset='utf-8'>"];
         [html appendString:@"<meta name='viewport' content='width=device-width, initial-scale=1.0'>"];
         [html appendString:@"<style>"];
-        if (self.darkMode) {
-            [html appendFormat:@"body { font-family: %@; font-size: %ldpx; line-height: 1.6; padding: 16px; color: #ccc; background: #1a1a1a; }", self.fontFamily, (long)self.fontSize];
-            [html appendString:@"h1, h2, h3 { color: #7ba4d4; }"];
-            [html appendString:@"blockquote { border-left: 3px solid #7ba4d4; padding-left: 12px; margin-left: 0; color: #999; font-style: italic; }"];
-            [html appendString:@"a.verse { color: #7ba4d4; text-decoration: underline; cursor: pointer; }"];
-            [html appendString:@"a { color: #7ba4d4; }"];
-            [html appendString:@"hr { border: none; border-top: 1px solid #333; margin: 20px 0; }"];
-            [html appendString:@"#verse-popup { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:999; }"];
-            [html appendString:@"#verse-content { position:absolute; top:10%; left:5%; right:5%; max-height:75%; overflow-y:auto; "];
-            [html appendString:@"background:#2a2a2a; border-radius:12px; padding:20px; box-shadow:0 4px 20px rgba(0,0,0,0.5); "];
-            [html appendFormat:@"font-family:%@; font-size:%ldpx; line-height:1.6; color:#ccc; }", self.fontFamily, (long)(self.fontSize - 1)];
-            [html appendString:@"#verse-content h2 { color:#7ba4d4; font-size:20px; margin:8px 0; }"];
-            [html appendString:@"#verse-content sup { color:#666; font-size:12px; }"];
-            [html appendString:@"#verse-close { position:absolute; top:12px; right:16px; font-size:28px; color:#666; cursor:pointer; z-index:1000; }"];
-            [html appendString:@"#verse-translations { margin-bottom:12px; }"];
-            [html appendString:@"#verse-translations button { padding:6px 14px; margin-right:6px; margin-bottom:4px; border:1px solid #7ba4d4; border-radius:6px; background:#2a2a2a; color:#7ba4d4; font-size:14px; cursor:pointer; }"];
-            [html appendString:@"#verse-translations button.active { background:#7ba4d4; color:#1a1a1a; }"];
+        // Theme colors
+        NSString *bodyBg, *bodyColor, *headingColor, *quoteColor, *linkColor, *hrColor;
+        NSString *popupBg, *popupOverlay, *popupColor, *popupShadow;
+        NSString *btnBg, *btnBorder, *btnColor, *btnActiveBg, *btnActiveColor;
+        NSString *supColor, *closeColor;
+
+        if ([self isDark]) {
+            bodyBg = @"#1a1a1a"; bodyColor = @"#ccc"; headingColor = @"#7ba4d4";
+            quoteColor = @"#999"; linkColor = @"#7ba4d4"; hrColor = @"#333";
+            popupBg = @"#2a2a2a"; popupOverlay = @"rgba(0,0,0,0.7)"; popupColor = @"#ccc"; popupShadow = @"rgba(0,0,0,0.5)";
+            btnBg = @"#2a2a2a"; btnBorder = @"#7ba4d4"; btnColor = @"#7ba4d4"; btnActiveBg = @"#7ba4d4"; btnActiveColor = @"#1a1a1a";
+            supColor = @"#666"; closeColor = @"#666";
+        } else if ([self isSepia]) {
+            bodyBg = @"#f5ebe0"; bodyColor = @"#5c4033"; headingColor = @"#6b4226";
+            quoteColor = @"#8b7355"; linkColor = @"#6b4226"; hrColor = @"#d4c4a8";
+            popupBg = @"#f0e4d0"; popupOverlay = @"rgba(0,0,0,0.4)"; popupColor = @"#5c4033"; popupShadow = @"rgba(0,0,0,0.2)";
+            btnBg = @"#f0e4d0"; btnBorder = @"#6b4226"; btnColor = @"#6b4226"; btnActiveBg = @"#6b4226"; btnActiveColor = @"#f5ebe0";
+            supColor = @"#a08060"; closeColor = @"#a08060";
         } else {
-            [html appendFormat:@"body { font-family: %@; font-size: %ldpx; line-height: 1.6; padding: 16px; color: #333; background: #fefefe; }", self.fontFamily, (long)self.fontSize];
-            [html appendString:@"h1, h2, h3 { color: #2E4161; }"];
-            [html appendString:@"blockquote { border-left: 3px solid #2E4161; padding-left: 12px; margin-left: 0; color: #555; font-style: italic; }"];
-            [html appendString:@"a.verse { color: #2E4161; text-decoration: underline; cursor: pointer; }"];
-            [html appendString:@"a { color: #2E4161; }"];
-            [html appendString:@"hr { border: none; border-top: 1px solid #ddd; margin: 20px 0; }"];
-            [html appendString:@"#verse-popup { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:999; }"];
-            [html appendString:@"#verse-content { position:absolute; top:10%; left:5%; right:5%; max-height:75%; overflow-y:auto; "];
-            [html appendString:@"background:#fff; border-radius:12px; padding:20px; box-shadow:0 4px 20px rgba(0,0,0,0.3); "];
-            [html appendFormat:@"font-family:%@; font-size:%ldpx; line-height:1.6; color:#333; }", self.fontFamily, (long)(self.fontSize - 1)];
-            [html appendString:@"#verse-content h2 { color:#2E4161; font-size:20px; margin:8px 0; }"];
-            [html appendString:@"#verse-content sup { color:#888; font-size:12px; }"];
-            [html appendString:@"#verse-close { position:absolute; top:12px; right:16px; font-size:28px; color:#999; cursor:pointer; z-index:1000; }"];
-            [html appendString:@"#verse-translations { margin-bottom:12px; }"];
-            [html appendString:@"#verse-translations button { padding:6px 14px; margin-right:6px; margin-bottom:4px; border:1px solid #2E4161; border-radius:6px; background:#fff; color:#2E4161; font-size:14px; cursor:pointer; }"];
-            [html appendString:@"#verse-translations button.active { background:#2E4161; color:#fff; }"];
+            bodyBg = @"#fefefe"; bodyColor = @"#333"; headingColor = @"#2E4161";
+            quoteColor = @"#555"; linkColor = @"#2E4161"; hrColor = @"#ddd";
+            popupBg = @"#fff"; popupOverlay = @"rgba(0,0,0,0.5)"; popupColor = @"#333"; popupShadow = @"rgba(0,0,0,0.3)";
+            btnBg = @"#fff"; btnBorder = @"#2E4161"; btnColor = @"#2E4161"; btnActiveBg = @"#2E4161"; btnActiveColor = @"#fff";
+            supColor = @"#888"; closeColor = @"#999";
         }
+
+        [html appendFormat:@"body { font-family: %@; font-size: %ldpx; line-height: 1.6; padding: 16px; color: %@; background: %@; }", self.fontFamily, (long)self.fontSize, bodyColor, bodyBg];
+        [html appendFormat:@"h1, h2, h3 { color: %@; }", headingColor];
+        [html appendFormat:@"blockquote { border-left: 3px solid %@; padding-left: 12px; margin-left: 0; color: %@; font-style: italic; }", headingColor, quoteColor];
+        [html appendFormat:@"a.verse { color: %@; text-decoration: underline; cursor: pointer; }", linkColor];
+        [html appendFormat:@"a { color: %@; }", linkColor];
+        [html appendFormat:@"hr { border: none; border-top: 1px solid %@; margin: 20px 0; }", hrColor];
+        [html appendFormat:@"#verse-popup { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:%@; z-index:999; }", popupOverlay];
+        [html appendString:@"#verse-content { position:absolute; top:10%%; left:5%%; right:5%%; max-height:75%%; overflow-y:auto; "];
+        [html appendFormat:@"background:%@; border-radius:12px; padding:20px; box-shadow:0 4px 20px %@; ", popupBg, popupShadow];
+        [html appendFormat:@"font-family:%@; font-size:%ldpx; line-height:1.6; color:%@; }", self.fontFamily, (long)(self.fontSize - 1), popupColor];
+        [html appendFormat:@"#verse-content h2 { color:%@; font-size:20px; margin:8px 0; }", headingColor];
+        [html appendFormat:@"#verse-content sup { color:%@; font-size:12px; }", supColor];
+        [html appendFormat:@"#verse-close { position:absolute; top:12px; right:16px; font-size:28px; color:%@; cursor:pointer; z-index:1000; }", closeColor];
+        [html appendString:@"#verse-translations { margin-bottom:12px; }"];
+        [html appendFormat:@"#verse-translations button { padding:6px 14px; margin-right:6px; margin-bottom:4px; border:1px solid %@; border-radius:6px; background:%@; color:%@; font-size:14px; cursor:pointer; }", btnBorder, btnBg, btnColor];
+        [html appendFormat:@"#verse-translations button.active { background:%@; color:%@; }", btnActiveBg, btnActiveColor];
         [html appendString:@"</style></head><body>"];
 
         // Popup overlay
@@ -470,7 +506,7 @@
             if (title) {
                 [html appendFormat:@"<h2>%@</h2>", title];
                 if (date) {
-                    NSString *sub = self.darkMode ? @"color:#888;" : @"color:#999;";
+                    NSString *sub = [self isDark] ? @"color:#888;" : [self isSepia] ? @"color:#a08060;" : @"color:#999;";
                     [html appendFormat:@"<p style='margin:-8px 0 12px 0;font-size:14px;%@'>%@, %@</p>", sub, dayLabel, date];
                 }
             }

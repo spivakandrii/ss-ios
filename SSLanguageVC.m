@@ -16,11 +16,20 @@
 }
 
 - (void)applyTheme {
-    BOOL dark = [[NSUserDefaults standardUserDefaults] boolForKey:@"darkMode"];
-    self.view.backgroundColor = dark ? [UIColor blackColor] : [UIColor whiteColor];
-    self.navigationController.navigationBar.tintColor = dark
-        ? [UIColor colorWithWhite:0.15 alpha:1.0]
-        : [UIColor colorWithRed:0.18 green:0.25 blue:0.38 alpha:1.0];
+    NSString *theme = [[NSUserDefaults standardUserDefaults] stringForKey:@"theme"];
+    BOOL dark = [theme isEqualToString:@"dark"];
+    BOOL sepia = [theme isEqualToString:@"sepia"];
+
+    if (dark) {
+        self.view.backgroundColor = [UIColor blackColor];
+        self.navigationController.navigationBar.tintColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+    } else if (sepia) {
+        self.view.backgroundColor = [UIColor colorWithRed:0.96 green:0.92 blue:0.84 alpha:1.0];
+        self.navigationController.navigationBar.tintColor = [UIColor colorWithRed:0.55 green:0.40 blue:0.25 alpha:1.0];
+    } else {
+        self.view.backgroundColor = [UIColor whiteColor];
+        self.navigationController.navigationBar.tintColor = [UIColor colorWithRed:0.18 green:0.25 blue:0.38 alpha:1.0];
+    }
 
     for (UIView *sub in self.view.subviews) {
         if ([sub isKindOfClass:[UIButton class]]) {
@@ -31,6 +40,10 @@
                 [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
                 btn.layer.borderColor = [[UIColor colorWithWhite:0.4 alpha:1.0] CGColor];
                 btn.backgroundColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+            } else if (sepia) {
+                [btn setTitleColor:[UIColor colorWithRed:0.42 green:0.26 blue:0.15 alpha:1.0] forState:UIControlStateNormal];
+                btn.layer.borderColor = [[UIColor colorWithRed:0.55 green:0.40 blue:0.25 alpha:0.5] CGColor];
+                btn.backgroundColor = [UIColor colorWithRed:0.94 green:0.89 blue:0.80 alpha:1.0];
             } else {
                 [btn setTitleColor:[UIColor colorWithRed:0.18 green:0.25 blue:0.38 alpha:1.0] forState:UIControlStateNormal];
                 btn.layer.borderColor = [[UIColor colorWithRed:0.18 green:0.25 blue:0.38 alpha:0.3] CGColor];
@@ -111,7 +124,7 @@
 }
 
 - (void)presentLanguagePicker {
-    BOOL dark = [[NSUserDefaults standardUserDefaults] boolForKey:@"darkMode"];
+    BOOL dark = [[[NSUserDefaults standardUserDefaults] stringForKey:@"theme"] isEqualToString:@"dark"];
 
     UIViewController *pickerVC = [[UIViewController alloc] init];
     pickerVC.title = @"Оберіть мову";
@@ -162,7 +175,7 @@
     cell.textLabel.font = [UIFont boldSystemFontOfSize:17];
     cell.detailTextLabel.textColor = [UIColor grayColor];
 
-    BOOL dark = [[NSUserDefaults standardUserDefaults] boolForKey:@"darkMode"];
+    BOOL dark = [[[NSUserDefaults standardUserDefaults] stringForKey:@"theme"] isEqualToString:@"dark"];
     cell.backgroundColor = dark ? [UIColor colorWithWhite:0.13 alpha:1.0] : [UIColor whiteColor];
     cell.textLabel.textColor = dark ? [UIColor colorWithWhite:0.85 alpha:1.0] : [UIColor blackColor];
     cell.detailTextLabel.textColor = dark ? [UIColor colorWithWhite:0.5 alpha:1.0] : [UIColor grayColor];

@@ -16,15 +16,23 @@
 }
 
 - (void)applyTheme {
-    BOOL dark = [[NSUserDefaults standardUserDefaults] boolForKey:@"darkMode"];
-    self.tableView.backgroundColor = dark ? [UIColor colorWithWhite:0.1 alpha:1.0] : [UIColor whiteColor];
-    self.tableView.separatorColor = dark ? [UIColor colorWithWhite:0.2 alpha:1.0] : nil;
-    self.navigationController.navigationBar.tintColor = dark
-        ? [UIColor colorWithWhite:0.15 alpha:1.0]
-        : [UIColor colorWithRed:0.18 green:0.25 blue:0.38 alpha:1.0];
+    NSString *theme = [[NSUserDefaults standardUserDefaults] stringForKey:@"theme"];
+    BOOL dark = [theme isEqualToString:@"dark"];
+    BOOL sepia = [theme isEqualToString:@"sepia"];
     if (dark) {
+        self.tableView.backgroundColor = [UIColor colorWithWhite:0.1 alpha:1.0];
+        self.tableView.separatorColor = [UIColor colorWithWhite:0.2 alpha:1.0];
+        self.navigationController.navigationBar.tintColor = [UIColor colorWithWhite:0.15 alpha:1.0];
         self.spinner.activityIndicatorViewStyle = UIActivityIndicatorViewStyleWhite;
+    } else if (sepia) {
+        self.tableView.backgroundColor = [UIColor colorWithRed:0.96 green:0.92 blue:0.84 alpha:1.0];
+        self.tableView.separatorColor = [UIColor colorWithRed:0.83 green:0.77 blue:0.66 alpha:1.0];
+        self.navigationController.navigationBar.tintColor = [UIColor colorWithRed:0.55 green:0.40 blue:0.25 alpha:1.0];
+        self.spinner.activityIndicatorViewStyle = UIActivityIndicatorViewStyleGray;
     } else {
+        self.tableView.backgroundColor = [UIColor whiteColor];
+        self.tableView.separatorColor = nil;
+        self.navigationController.navigationBar.tintColor = [UIColor colorWithRed:0.18 green:0.25 blue:0.38 alpha:1.0];
         self.spinner.activityIndicatorViewStyle = UIActivityIndicatorViewStyleGray;
     }
 }
@@ -75,10 +83,22 @@
     cell.textLabel.numberOfLines = 2;
     cell.textLabel.font = [UIFont boldSystemFontOfSize:16];
 
-    BOOL dark = [[NSUserDefaults standardUserDefaults] boolForKey:@"darkMode"];
-    cell.backgroundColor = dark ? [UIColor colorWithWhite:0.13 alpha:1.0] : [UIColor whiteColor];
-    cell.textLabel.textColor = dark ? [UIColor colorWithWhite:0.85 alpha:1.0] : [UIColor blackColor];
-    cell.detailTextLabel.textColor = dark ? [UIColor colorWithWhite:0.5 alpha:1.0] : [UIColor grayColor];
+    NSString *theme = [[NSUserDefaults standardUserDefaults] stringForKey:@"theme"];
+    BOOL dark = [theme isEqualToString:@"dark"];
+    BOOL sepia = [theme isEqualToString:@"sepia"];
+    if (dark) {
+        cell.backgroundColor = [UIColor colorWithWhite:0.13 alpha:1.0];
+        cell.textLabel.textColor = [UIColor colorWithWhite:0.85 alpha:1.0];
+        cell.detailTextLabel.textColor = [UIColor colorWithWhite:0.5 alpha:1.0];
+    } else if (sepia) {
+        cell.backgroundColor = [UIColor colorWithRed:0.94 green:0.89 blue:0.80 alpha:1.0];
+        cell.textLabel.textColor = [UIColor colorWithRed:0.36 green:0.25 blue:0.20 alpha:1.0];
+        cell.detailTextLabel.textColor = [UIColor colorWithRed:0.55 green:0.40 blue:0.25 alpha:1.0];
+    } else {
+        cell.backgroundColor = [UIColor whiteColor];
+        cell.textLabel.textColor = [UIColor blackColor];
+        cell.detailTextLabel.textColor = [UIColor grayColor];
+    }
 
     return cell;
 }
