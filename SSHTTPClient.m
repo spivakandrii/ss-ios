@@ -44,7 +44,7 @@ static size_t write_callback(char *ptr, size_t size, size_t nmemb, void *userdat
     curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L); // required when curl runs on background threads
 
     NSLog(@"SSHTTPClient: fetching %@", urlString);
 
