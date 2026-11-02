@@ -198,14 +198,14 @@
 - (void)fontSmaller {
     if (self.fontSize > 14) {
         self.fontSize -= 2;
-        [self savePrefsAndReload];
+        [self savePrefsAndApplyStyle];
     }
 }
 
 - (void)fontLarger {
     if (self.fontSize < 28) {
         self.fontSize += 2;
-        [self savePrefsAndReload];
+        [self savePrefsAndApplyStyle];
     }
 }
 
@@ -224,7 +224,7 @@
     NSArray *items = self.bottomBar.items;
     UIBarButtonItem *themeBtn = [items objectAtIndex:[items count] - 3]; // flex, themeBtn, flex, noteBtn
     themeBtn.title = next;
-    [self savePrefsAndReload];
+    [self savePrefsAndApplyStyle];
 }
 
 - (void)showFontPicker {
@@ -247,7 +247,7 @@
     }
     self.fontFamily = font;
     [[NSUserDefaults standardUserDefaults] setObject:font forKey:@"fontFamily"];
-    [self savePrefsAndReload];
+    [self savePrefsAndApplyStyle];
 }
 
 - (NSString *)noteKey {
@@ -305,13 +305,71 @@
     [self dismissModalViewControllerAnimated:YES];
 }
 
-- (void)savePrefsAndReload {
+- (void)savePrefsAndApplyStyle {
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
     [ud setInteger:self.fontSize forKey:@"fontSize"];
     [ud setObject:self.theme forKey:@"theme"];
     [ud removeObjectForKey:@"darkMode"];
     [ud synchronize];
-    [self loadDay:self.currentDayIndex];
+    // Swap CSS in place — no page reload, scroll position is kept
+    NSString *css = [self themeCSS];
+    css = [css stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"];
+    css = [css stringByReplacingOccurrencesOfString:@"'" withString:@"\\'"];
+    NSString *js = [NSString stringWithFormat:@"var s=document.getElementById('ss-theme');if(s)s.textContent='%@';", css];
+    [self.webView stringByEvaluatingJavaScriptFromString:js];
+}
+
+- (NSString *)themeCSS {
+    NSString *bodyBg, *bodyColor, *headingColor, *quoteColor, *linkColor, *hrColor;
+    NSString *popupBg, *popupOverlay, *popupColor, *popupShadow;
+    NSString *btnBg, *btnBorder, *btnColor, *btnActiveBg, *btnActiveColor;
+    NSString *supColor, *closeColor, *dateColor;
+
+    if ([self isDark]) {
+        bodyBg = @"#1a1a1a"; bodyColor = @"#ccc"; headingColor = @"#7ba4d4";
+        quoteColor = @"#999"; linkColor = @"#7ba4d4"; hrColor = @"#333";
+        popupBg = @"#2a2a2a"; popupOverlay = @"rgba(0,0,0,0.7)"; popupColor = @"#ccc"; popupShadow = @"rgba(0,0,0,0.5)";
+        btnBg = @"#2a2a2a"; btnBorder = @"#7ba4d4"; btnColor = @"#7ba4d4"; btnActiveBg = @"#7ba4d4"; btnActiveColor = @"#1a1a1a";
+        supColor = @"#666"; closeColor = @"#666"; dateColor = @"#888";
+    } else if ([self isSepia]) {
+        bodyBg = @"#f5ebe0"; bodyColor = @"#5c4033"; headingColor = @"#6b4226";
+        quoteColor = @"#8b7355"; linkColor = @"#6b4226"; hrColor = @"#d4c4a8";
+        popupBg = @"#f0e4d0"; popupOverlay = @"rgba(0,0,0,0.4)"; popupColor = @"#5c4033"; popupShadow = @"rgba(0,0,0,0.2)";
+        btnBg = @"#f0e4d0"; btnBorder = @"#6b4226"; btnColor = @"#6b4226"; btnActiveBg = @"#6b4226"; btnActiveColor = @"#f5ebe0";
+        supColor = @"#a08060"; closeColor = @"#a08060"; dateColor = @"#a08060";
+    } else {
+        bodyBg = @"#fefefe"; bodyColor = @"#333"; headingColor = @"#2E4161";
+        quoteColor = @"#555"; linkColor = @"#2E4161"; hrColor = @"#ddd";
+        popupBg = @"#fff"; popupOverlay = @"rgba(0,0,0,0.5)"; popupColor = @"#333"; popupShadow = @"rgba(0,0,0,0.3)";
+        btnBg = @"#fff"; btnBorder = @"#2E4161"; btnColor = @"#2E4161"; btnActiveBg = @"#2E4161"; btnActiveColor = @"#fff";
+        supColor = @"#888"; closeColor = @"#999"; dateColor = @"#999";
+    }
+
+    NSMutableString *css = [NSMutableString string];
+    [css appendFormat:@"body { font-family: %@; font-size: %ldpx; line-height: 1.6; padding: 16px; color: %@; background: %@; }", self.fontFamily, (long)self.fontSize, bodyColor, bodyBg];
+    [css appendFormat:@"h1, h2, h3 { color: %@; }", headingColor];
+    [css appendFormat:@"p.date { margin:-8px 0 12px 0; font-size:14px; color:%@; }", dateColor];
+    [css appendFormat:@"blockquote { border-left: 3px solid %@; padding-left: 12px; margin-left: 0; color: %@; font-style: italic; }", headingColor, quoteColor];
+    [css appendFormat:@"a.verse { color: %@; text-decoration: underline; cursor: pointer; }", linkColor];
+    [css appendFormat:@"a { color: %@; }", linkColor];
+    [css appendFormat:@"hr { border: none; border-top: 1px solid %@; margin: 20px 0; }", hrColor];
+    [css appendFormat:@"#verse-popup { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:%@; z-index:999; }", popupOverlay];
+    [css appendString:@"#verse-content { position:absolute; top:10%; left:5%; right:5%; max-height:75%; overflow-y:auto; -webkit-overflow-scrolling:touch; "];
+    [css appendFormat:@"background:%@; border-radius:12px; padding:20px; box-shadow:0 4px 20px %@; ", popupBg, popupShadow];
+    [css appendFormat:@"font-family:%@; font-size:%ldpx; line-height:1.6; color:%@; }", self.fontFamily, (long)(self.fontSize - 1), popupColor];
+    [css appendFormat:@"#verse-content h2 { color:%@; font-size:20px; margin:8px 0; }", headingColor];
+    [css appendFormat:@"#verse-content sup { color:%@; font-size:12px; }", supColor];
+    [css appendFormat:@"#verse-close { position:absolute; top:12px; right:16px; font-size:28px; color:%@; cursor:pointer; z-index:1000; }", closeColor];
+    [css appendString:@"#verse-translations { margin-bottom:12px; }"];
+    [css appendFormat:@"#verse-translations button { padding:6px 14px; margin-right:6px; margin-bottom:4px; border:1px solid %@; border-radius:6px; background:%@; color:%@; font-size:14px; cursor:pointer; }", btnBorder, btnBg, btnColor];
+    [css appendFormat:@"#verse-translations button.active { background:%@; color:%@; }", btnActiveBg, btnActiveColor];
+    return css;
+}
+
+- (NSString *)jsonString:(id)obj {
+    NSData *data = [NSJSONSerialization dataWithJSONObject:obj options:0 error:nil];
+    if (!data) return @"null";
+    return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
 }
 
 - (void)setupSpinner {
@@ -332,8 +390,10 @@
     NSDictionary *day = [self.days objectAtIndex:self.currentDayIndex];
     NSString *dayId = [day objectForKey:@"id"];
     NSString *key = [NSString stringWithFormat:@"read_%@_%@_%@", self.quarterlyId, self.lessonId, dayId];
-    [[NSUserDefaults standardUserDefaults] setBool:YES forKey:key];
-    [[NSUserDefaults standardUserDefaults] synchronize];
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    if ([ud boolForKey:key]) return; // already marked — skip disk write and title refresh
+    [ud setBool:YES forKey:key];
+    [ud synchronize];
     [self updateDaySelectorMarks];
 }
 
@@ -415,82 +475,15 @@
             }
         }
 
-        // Build JS: bibleVerses = { 'UKR': { 'key': 'html', ... }, 'CUV': { ... } }
-        NSMutableString *versesJS = [NSMutableString stringWithString:@"var bibleVerses={"];
-        for (NSInteger t = 0; t < (NSInteger)translationNames.count; t++) {
-            NSString *tName = [translationNames objectAtIndex:t];
-            NSDictionary *verses = [allTranslations objectForKey:tName];
-            [versesJS appendFormat:@"'%@':{", tName];
-            NSArray *allKeys = [verses allKeys];
-            for (NSInteger i = 0; i < (NSInteger)allKeys.count; i++) {
-                NSString *key = [allKeys objectAtIndex:i];
-                NSString *val = [verses objectForKey:key];
-                val = [val stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"];
-                val = [val stringByReplacingOccurrencesOfString:@"'" withString:@"\\'"];
-                val = [val stringByReplacingOccurrencesOfString:@"\n" withString:@"\\n"];
-                val = [val stringByReplacingOccurrencesOfString:@"\r" withString:@""];
-                [versesJS appendFormat:@"'%@':'%@'", key, val];
-                if (i < (NSInteger)allKeys.count - 1) [versesJS appendString:@","];
-            }
-            [versesJS appendString:@"}"];
-            if (t < (NSInteger)translationNames.count - 1) [versesJS appendString:@","];
-        }
-        [versesJS appendString:@"};"];
-
-        // Build JS array of translation names
-        [versesJS appendString:@"var translationNames=["];
-        for (NSInteger t = 0; t < (NSInteger)translationNames.count; t++) {
-            [versesJS appendFormat:@"'%@'", [translationNames objectAtIndex:t]];
-            if (t < (NSInteger)translationNames.count - 1) [versesJS appendString:@","];
-        }
-        [versesJS appendString:@"];"];
+        // Native JSON encoder is much faster than escaping every verse by hand
+        NSString *versesJS = [NSString stringWithFormat:@"var bibleVerses=%@;var translationNames=%@;",
+                              [self jsonString:allTranslations], [self jsonString:translationNames]];
 
         NSMutableString *html = [NSMutableString string];
         [html appendString:@"<html><head><meta charset='utf-8'>"];
         [html appendString:@"<meta name='viewport' content='width=device-width, initial-scale=1.0'>"];
-        [html appendString:@"<style>"];
-        // Theme colors
-        NSString *bodyBg, *bodyColor, *headingColor, *quoteColor, *linkColor, *hrColor;
-        NSString *popupBg, *popupOverlay, *popupColor, *popupShadow;
-        NSString *btnBg, *btnBorder, *btnColor, *btnActiveBg, *btnActiveColor;
-        NSString *supColor, *closeColor;
-
-        if ([self isDark]) {
-            bodyBg = @"#1a1a1a"; bodyColor = @"#ccc"; headingColor = @"#7ba4d4";
-            quoteColor = @"#999"; linkColor = @"#7ba4d4"; hrColor = @"#333";
-            popupBg = @"#2a2a2a"; popupOverlay = @"rgba(0,0,0,0.7)"; popupColor = @"#ccc"; popupShadow = @"rgba(0,0,0,0.5)";
-            btnBg = @"#2a2a2a"; btnBorder = @"#7ba4d4"; btnColor = @"#7ba4d4"; btnActiveBg = @"#7ba4d4"; btnActiveColor = @"#1a1a1a";
-            supColor = @"#666"; closeColor = @"#666";
-        } else if ([self isSepia]) {
-            bodyBg = @"#f5ebe0"; bodyColor = @"#5c4033"; headingColor = @"#6b4226";
-            quoteColor = @"#8b7355"; linkColor = @"#6b4226"; hrColor = @"#d4c4a8";
-            popupBg = @"#f0e4d0"; popupOverlay = @"rgba(0,0,0,0.4)"; popupColor = @"#5c4033"; popupShadow = @"rgba(0,0,0,0.2)";
-            btnBg = @"#f0e4d0"; btnBorder = @"#6b4226"; btnColor = @"#6b4226"; btnActiveBg = @"#6b4226"; btnActiveColor = @"#f5ebe0";
-            supColor = @"#a08060"; closeColor = @"#a08060";
-        } else {
-            bodyBg = @"#fefefe"; bodyColor = @"#333"; headingColor = @"#2E4161";
-            quoteColor = @"#555"; linkColor = @"#2E4161"; hrColor = @"#ddd";
-            popupBg = @"#fff"; popupOverlay = @"rgba(0,0,0,0.5)"; popupColor = @"#333"; popupShadow = @"rgba(0,0,0,0.3)";
-            btnBg = @"#fff"; btnBorder = @"#2E4161"; btnColor = @"#2E4161"; btnActiveBg = @"#2E4161"; btnActiveColor = @"#fff";
-            supColor = @"#888"; closeColor = @"#999";
-        }
-
-        [html appendFormat:@"body { font-family: %@; font-size: %ldpx; line-height: 1.6; padding: 16px; color: %@; background: %@; }", self.fontFamily, (long)self.fontSize, bodyColor, bodyBg];
-        [html appendFormat:@"h1, h2, h3 { color: %@; }", headingColor];
-        [html appendFormat:@"blockquote { border-left: 3px solid %@; padding-left: 12px; margin-left: 0; color: %@; font-style: italic; }", headingColor, quoteColor];
-        [html appendFormat:@"a.verse { color: %@; text-decoration: underline; cursor: pointer; }", linkColor];
-        [html appendFormat:@"a { color: %@; }", linkColor];
-        [html appendFormat:@"hr { border: none; border-top: 1px solid %@; margin: 20px 0; }", hrColor];
-        [html appendFormat:@"#verse-popup { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:%@; z-index:999; }", popupOverlay];
-        [html appendString:@"#verse-content { position:absolute; top:10%%; left:5%%; right:5%%; max-height:75%%; overflow-y:auto; "];
-        [html appendFormat:@"background:%@; border-radius:12px; padding:20px; box-shadow:0 4px 20px %@; ", popupBg, popupShadow];
-        [html appendFormat:@"font-family:%@; font-size:%ldpx; line-height:1.6; color:%@; }", self.fontFamily, (long)(self.fontSize - 1), popupColor];
-        [html appendFormat:@"#verse-content h2 { color:%@; font-size:20px; margin:8px 0; }", headingColor];
-        [html appendFormat:@"#verse-content sup { color:%@; font-size:12px; }", supColor];
-        [html appendFormat:@"#verse-close { position:absolute; top:12px; right:16px; font-size:28px; color:%@; cursor:pointer; z-index:1000; }", closeColor];
-        [html appendString:@"#verse-translations { margin-bottom:12px; }"];
-        [html appendFormat:@"#verse-translations button { padding:6px 14px; margin-right:6px; margin-bottom:4px; border:1px solid %@; border-radius:6px; background:%@; color:%@; font-size:14px; cursor:pointer; }", btnBorder, btnBg, btnColor];
-        [html appendFormat:@"#verse-translations button.active { background:%@; color:%@; }", btnActiveBg, btnActiveColor];
+        [html appendString:@"<style id='ss-theme'>"];
+        [html appendString:[self themeCSS]];
         [html appendString:@"</style></head><body>"];
 
         // Popup overlay
@@ -506,8 +499,7 @@
             if (title) {
                 [html appendFormat:@"<h2>%@</h2>", title];
                 if (date) {
-                    NSString *sub = [self isDark] ? @"color:#888;" : [self isSepia] ? @"color:#a08060;" : @"color:#999;";
-                    [html appendFormat:@"<p style='margin:-8px 0 12px 0;font-size:14px;%@'>%@, %@</p>", sub, dayLabel, date];
+                    [html appendFormat:@"<p class='date'>%@, %@</p>", dayLabel, date];
                 }
             }
             if (content) {

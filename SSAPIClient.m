@@ -2,6 +2,7 @@
 #import "SSHTTPClient.h"
 
 #define SS_API_BASE @"https://sabbath-school.adventech.io/api/v2"
+#define SS_CACHE_FRESH_SECONDS (6 * 60 * 60)
 
 @implementation SSAPIClient
 
@@ -63,8 +64,11 @@
     id cached = [self loadJSON:cachePath];
     if (cached) {
         if (completion) completion(cached, nil);
-        // Silently refresh in background — no callback to avoid reload loops
-        [self backgroundFetch:remoteURL saveTo:cachePath];
+        // Silently refresh in background — no callback to avoid reload loops.
+        // Skip if cache is recent: TLS handshake on A4 is expensive.
+        if (![self isFresh:cachePath]) {
+            [self backgroundFetch:remoteURL saveTo:cachePath];
+        }
         return;
     }
 
@@ -105,6 +109,11 @@
 }
 
 #pragma mark - Helpers
+
+- (BOOL)isFresh:(NSString *)path {
+    NSDate *modified = [[[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil] fileModificationDate];
+    return modified && -[modified timeIntervalSinceNow] < SS_CACHE_FRESH_SECONDS;
+}
 
 - (void)saveData:(NSData *)data toPath:(NSString *)path {
     NSString *dir = [path stringByDeletingLastPathComponent];
